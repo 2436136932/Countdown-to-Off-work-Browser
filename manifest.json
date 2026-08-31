@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "Offwork Countdown — 下班倒计时",
+  "short_name": "下班倒计时",
+  "version": "1.4.0",
+  "description": "Apple 风格的下班倒计时。8 款 Apple 原生高质感皮肤与微纹理，角标显示剩余时间，下班提醒，法定节假日与调休日历（联网自动更新），月薪折算与自定义倒数日。",
+  "minimum_chrome_version": "110",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage", "alarms", "notifications", "activeTab", "scripting"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["core.js", "theme.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-float-widget": {
+      "suggested_key": {
+        "default": "Alt+W",
+        "mac": "Alt+W"
+      },
+      "description": "打开/收起 网页端大圆角毛玻璃悬浮小组件"
+    }
+  },
+  "host_permissions": [
+    "https://cdn.jsdelivr.net/*",
+    "https://fastly.jsdelivr.net/*",
+    "https://raw.githubusercontent.com/*"
+  ],
+  "offline_enabled": true
+}

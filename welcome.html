@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>下班倒计时 — 一眼可见的等待</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-material: rgba(255, 255, 255, 0.72);
+    --bg-alt: #F5F5F7;
+    --text-primary: #1D1D1F;
+    --text-secondary: #86868B;
+    --accent: #0071E3;
+    --border: #D2D2D7;
+    --hairline: rgba(0, 0, 0, 0.08);
+    --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+    --nav-h: 52px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg-material);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC",
+                 "HarmonyOS Sans SC", "Inter", system-ui, sans-serif;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ============ 吸顶导航 + 毛玻璃 ============ */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: var(--nav-h);
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .nav-inner {
+    width: min(1024px, calc(100% - 48px));
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+  .brand-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .brand-dot::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 45%;
+    width: 6px; height: 6px;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 1.5px;
+  }
+  .nav-links { display: flex; align-items: center; gap: 32px; }
+  .nav-links a {
+    font-size: 14px;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: color .15s var(--ease);
+  }
+  .nav-links a:hover { color: var(--accent); }
+  .nav-cta {
+    appearance: none;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1;
+    padding: 9px 18px;
+    border-radius: 980px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity .15s var(--ease);
+  }
+  .nav-cta:hover { opacity: .9; }
+
+  /* ============ Hero ============ */
+  section { padding-top: 120px; }   /* 区块间距 ≥ 80px */
+  .hero {
+    text-align: center;
+    padding-top: 96px;
+  }
+  h1 {
+    font-size: clamp(40px, 7vw, 56px);
+    font-weight: 300;
+    letter-spacing: -0.015em;
+    line-height: 1.07;
+  }
+  .hero-sub {
+    margin-top: 20px;
+    font-size: 21px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .hero-note { margin-top: 10px; font-size: 15px; color: var(--text-secondary); }
+
+  .hero-actions {
+    margin-top: 36px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  /* 主按钮：胶囊 */
+  .btn-primary {
+    appearance: none;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 17px;
+    line-height: 1;
+    padding: 15px 34px;
+    border-radius: 980px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity .2s var(--ease);
+  }
+  .btn-primary:hover { opacity: .9; }
+  /* 次按钮：透明背景 + 强调色边框 */
+  .btn-secondary {
+    appearance: none;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 17px;
+    line-height: 1;
+    padding: 15px 34px;
+    border-radius: 980px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color .2s var(--ease);
+  }
+  .btn-secondary:hover { background: rgba(0, 113, 227, 0.06); }
+
+  /* ---- 产品图：占屏幕高度 50%，灰底舞台 ---- */
+  .stage {
+    margin-top: 64px;
+    height: 50vh;
+    min-height: 380px;
+    background: var(--bg-alt);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ---- 纯 CSS 复刻的组件卡片（即“产品图”）---- */
+  .demo-card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+    padding: 28px 32px 24px;
+    width: min(420px, 84vw);
+    user-select: none;
+  }
+  .demo-label { font-size: 15px; color: var(--text-secondary); }
+  .demo-time {
+    margin-top: 2px;
+    font-size: 56px;
+    font-weight: 200;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+  .demo-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .demo-cell {
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 10px 2px 9px;
+    text-align: center;
+  }
+  .demo-cell-l { font-size: 11px; color: var(--text-secondary); white-space: pre-line; }
+  .demo-cell-v {
+    display: block;
+    margin-top: 4px;
+    font-size: 15px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .demo-caption { margin-top: 14px; font-size: 12px; color: var(--text-secondary); text-align:center; }
+
+  /* 试色控制台 */
+  .color-bar {
+    margin: 20px auto 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .color-dot {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    transition: transform .15s ease-out, box-shadow .15s ease-out;
+  }
+  .color-dot:hover { transform: scale(1.18); }
+  .color-dot.on {
+    transform: scale(1.24);
+    box-shadow: 0 0 0 2px var(--text-primary);
+  }
+
+  /* ============ Features：3 列特性卡片 ============ */
+  .section-head { text-align: center; max-width: 640px; margin: 0 auto; }
+  h2 {
+    font-size: 40px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+  .section-sub { margin-top: 14px; font-size: 17px; line-height: 1.5; color: var(--text-secondary); }
+
+  .features {
+    width: min(1024px, calc(100% - 48px));
+    margin: 56px auto 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  @media (max-width: 800px) { .features { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--bg-alt);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    padding: 36px 30px 34px;
+    transition: transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+  .card-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-icon svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 1.8; }
+  .card h3 {
+    margin-top: 22px;
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .card p {
+    margin-top: 10px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  /* ============ Setup（编号步骤） ============ */
+  .steps-wrap { width: min(640px, calc(100% - 48px)); margin: 56px auto 0; }
+  .step {
+    display: flex;
+    gap: 20px;
+    align-items: baseline;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .step:last-child { border-bottom: none; }
+  .step-n {
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    width: 28px;
+  }
+  .step-t { font-size: 17px; line-height: 1.5; }
+  .step-t small { display: block; margin-top: 4px; font-size: 15px; color: var(--text-secondary); }
+  kbd {
+    font-family: inherit;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 7px;
+    background: #fff;
+  }
+
+  /* ============ CTA ============ */
+  .cta {
+    text-align: center;
+    padding-bottom: 140px;
+  }
+  .cta h2 { max-width: 700px; margin: 0 auto; }
+
+  /* ============ Footer ============ */
+  footer {
+    border-top: 1px solid var(--hairline);
+    background: var(--bg-alt);
+    padding: 48px 0 56px;
+  }
+  .foot-inner {
+    width: min(1024px, calc(100% - 48px));
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    gap: 32px;
+  }
+  @media (max-width: 720px) { .foot-inner { grid-template-columns: 1fr 1fr; } }
+  .foot-brand p { margin-top: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; max-width: 260px; }
+  footer h4 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 14px; }
+  footer ul { list-style: none; }
+  footer li + li { margin-top: 10px; }
+  footer ul a { font-size: 13px; color: var(--text-secondary); text-decoration: none; transition: color .15s var(--ease); }
+  footer ul a:hover { color: var(--text-primary); }
+  .copyright {
+    width: min(1024px, calc(100% - 48px));
+    margin: 44px auto 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= 吸顶导航 ================= -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#"><span class="brand-dot"></span>下班倒计时</a>
+    <div class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#setup">安装</a>
+      <a href="#" id="nav-open-options">设置</a>
+      <button class="nav-cta" id="nav-install">添加至浏览器</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ================= Hero ================= -->
+<section class="hero">
+  <h1>下班，<br>一眼可见。</h1>
+  <p class="hero-sub">发薪日、周五、下一个节日和今天的收入，<br>都在工具栏的一枚小图标里。</p>
+  <p class="hero-note">免费 · 无广告 · 数据不出设备</p>
+
+  <div class="hero-actions">
+    <button class="btn-primary" id="hero-install">添加至浏览器</button>
+    <a class="btn-secondary" href="#setup">查看安装步骤</a>
+  </div>
+
+  <!-- 产品图：占屏幕高度 50% -->
+  <div class="stage">
+    <figure>
+      <div class="demo-card" aria-label="下班倒计时组件预览">
+        <p class="demo-label">下班还有</p>
+        <p class="demo-time" id="demo-time">--:--:--</p>
+        <div class="demo-cards">
+          <div class="demo-cell"><span class="demo-cell-l">发薪
+19 天</span><span class="demo-cell-v"></span></div>
+          <div class="demo-cell"><span class="demo-cell-l">周五
+1 天</span><span class="demo-cell-v"></span></div>
+          <div class="demo-cell"><span class="demo-cell-l">中元节
+0 天</span><span class="demo-cell-v"></span></div>
+          <div class="demo-cell"><span class="demo-cell-l">今天赚了
+74.115 ¥</span><span class="demo-cell-v"></span></div>
+        </div>
+      </div>
+      <figcaption class="demo-caption">实时预览 · 点击下方小圆点即刻换肤</figcaption>
+      <div class="color-bar" id="color-bar"></div>
+    </figure>
+  </div>
+</section>
+
+<!-- ================= Features ================= -->
+<section id="features">
+  <header class="section-head">
+    <h2>把等待变成期待。</h2>
+    <p class="section-sub">四个安静的数字，回答你一天中最常问自己的四件事。</p>
+  </header>
+
+  <div class="features">
+    <article class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+      <h3>精确到秒</h3>
+      <p>距下班的每一秒实时跳动。工作日之外自动显示休息状态，不制造焦虑。</p>
+    </article>
+    <article class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div>
+      <h3>看得见的盼头</h3>
+      <p>发薪倒计时、周五倒计时、下一个法定节假日——三个距离，一目了然。</p>
+    </article>
+    <article class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 8c0-1.7 2.2-3 5-3s5 1.3 5 3-2.2 3-5 3-5 1.3-5 3 2.2 3 5 3 5-1.3 5-3"/></svg></div>
+      <h3>今天赚了</h3>
+      <p>按你的日收入与工作时间线性累计，让每一分钟都有价值感。仅本地计算。</p>
+    </article>
+  </div>
+</section>
+
+<!-- ================= Setup ================= -->
+<section id="setup">
+  <header class="section-head">
+    <h2>三步开始。</h2>
+  </header>
+  <div class="steps-wrap">
+    <div class="step">
+      <span class="step-n">01</span>
+      <p class="step-t">点击右上角「添加至浏览器」完成安装。
+        <small>扩展不会请求任何多余权限。</small></p>
+    </div>
+    <div class="step">
+      <span class="step-n">02</span>
+      <p class="step-t">点击工具栏图标查看倒计时。
+        <small>建议按 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd> 显示工具栏。</small></p>
+    </div>
+    <div class="step">
+      <span class="step-n">03</span>
+      <p class="step-t">在设置中调整工作时间、发薪日与日收入。
+        <small>所有配置保存在本地浏览器同步存储中。</small></p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CTA ================= -->
+<section class="cta">
+  <h2>今天，也要好好下班。</h2>
+  <div class="hero-actions">
+    <button class="btn-primary" id="cta-install">免费添加至浏览器</button>
+  </div>
+</section>
+
+<!-- ================= Footer ================= -->
+<footer>
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <a class="brand" href="#"><span class="brand-dot"></span>下班倒计时</a>
+      <p>一款克制的效率小组件。为认真工作的你而做。</p>
+    </div>
+    <div>
+      <h4>产品</h4>
+      <ul>
+        <li><a href="#features">功能</a></li>
+        <li><a href="#setup">安装</a></li>
+        <li><a href="#">更新日志</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>支持</h4>
+      <ul>
+        <li><a href="#" id="foot-open-options">设置</a></li>
+        <li><a href="#">常见问题</a></li>
+        <li><a href="#">反馈建议</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>隐私</h4>
+      <ul>
+        <li><a href="#">数据仅在本地</a></li>
+        <li><a href="#">无任何追踪</a></li>
+      </ul>
+    </div>
+  </div>
+  <p class="copyright">© 2026 Offwork Countdown. 以 Apple Human Interface Guidelines 设计。</p>
+</footer>
+
+<script src="theme.js"></script>
+<script src="core.js"></script>
+<script src="welcome.js"></script>
+</body>
+</html>

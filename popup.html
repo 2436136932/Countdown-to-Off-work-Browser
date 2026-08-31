@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>下班倒计时</title>
+<style>
+  :root {
+    --bg-material: rgba(255, 255, 255, 0.88);
+    --surface: rgba(0, 0, 0, 0.035);
+    --surface-elevated: #FFFFFF;
+    --text-primary: #1D1D1F;
+    --text-secondary: #86868B;
+    --text-tertiary: #A1A1A6;
+    --accent: #0071E3;
+    --accent-deep: #0058B3;
+    --accent-soft: rgba(0, 113, 227, 0.08);
+    --accent-glow: rgba(0, 113, 227, 0.25);
+    --hairline: rgba(0, 0, 0, 0.08);
+    --segment-bg: rgba(0, 0, 0, 0.05);
+    --track-bg: rgba(0, 0, 0, 0.06);
+    --holiday-red: #FF3B30;
+    --ease-squircle: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  body.dark {
+    --bg-material: rgba(28, 28, 30, 0.90);
+    --surface: rgba(255, 255, 255, 0.07);
+    --surface-elevated: #2C2C2E;
+    --text-primary: #F5F5F7;
+    --text-secondary: #98989D;
+    --text-tertiary: #636366;
+    --accent: #0A84FF;
+    --accent-deep: #0071E3;
+    --accent-soft: rgba(10, 132, 255, 0.16);
+    --accent-glow: rgba(10, 132, 255, 0.35);
+    --hairline: rgba(255, 255, 255, 0.12);
+    --segment-bg: rgba(255, 255, 255, 0.08);
+    --track-bg: rgba(255, 255, 255, 0.12);
+    --holiday-red: #FF453A;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  html {
+    background: transparent;
+  }
+
+  body {
+    width: 340px;
+    min-height: 290px;
+    background: var(--bg-material);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+                 "HarmonyOS Sans SC", "Segoe UI", system-ui, sans-serif;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    padding: 18px 20px 16px;
+    user-select: none;
+    box-shadow: inset 0 0.5px 0 0.5px rgba(255, 255, 255, 0.3), inset 0 0 0 0.5px var(--hairline);
+    transition: background .2s ease;
+  }
+
+  /* ---------- 顶部分段控制器 (Segmented Control) ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .view-switch {
+    display: inline-flex;
+    background: var(--segment-bg);
+    border-radius: 999px;
+    padding: 2.5px;
+    box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.04);
+  }
+  .view-switch button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    padding: 5px 14px;
+    border-radius: 999px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all .24s var(--ease-squircle);
+  }
+  .view-switch button.on {
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 0.5px 1px rgba(0, 0, 0, 0.04);
+  }
+
+  .settings {
+    appearance: none;
+    border: none;
+    background: none;
+    padding: 5px 10px;
+    margin-right: -4px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .settings:hover {
+    background: var(--accent-soft);
+  }
+
+  /* ================= 倒计时视图 ================= */
+  .view { display: none; }
+  .view.on { display: block; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+
+  .status-badge-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+    display: inline-block;
+  }
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: .02em;
+  }
+  .countdown {
+    margin-top: 4px;
+    text-align: center;
+    font-size: 50px;
+    line-height: 1.0;
+    font-weight: 300;
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    color: var(--text-primary);
+  }
+  .countdown.rest-state {
+    font-size: 34px;
+    font-weight: 400;
+    padding: 10px 0;
+    color: var(--text-secondary);
+  }
+
+  /* ---------- 今日进度槽 (Apple Pill Capsule) ---------- */
+  .progress-wrap {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 2px;
+  }
+  .progress-track {
+    flex: 1;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--track-bg);
+    box-shadow: inset 0 0.5px 1.5px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+    box-shadow: 0 0 10px var(--accent-glow);
+    transition: width 0.8s var(--ease-squircle);
+  }
+  .progress-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 32px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- 小组件专区 (Apple Widgets Grid) ---------- */
+  
+  /* 今日收益横向胶囊卡（若开启） */
+  .income-banner-card {
+    margin-top: 14px;
+    background: var(--card-bg);
+    backdrop-filter: var(--card-blur);
+    -webkit-backdrop-filter: var(--card-blur);
+    border: 0.5px solid var(--card-border);
+    box-shadow: var(--card-shadow);
+    border-radius: 14px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: transform .25s var(--ease-squircle), box-shadow .25s ease, background .25s ease;
+  }
+  .income-banner-card:hover {
+    transform: translateY(-1.5px) scale(1.01);
+    box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.08), inset 0 1px 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  .income-label-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .income-val {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+
+  /* 倒数日方块小组件网格 */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .cards-grid.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .cards-grid.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .widget-card {
+    background: var(--card-bg);
+    backdrop-filter: var(--card-blur);
+    -webkit-backdrop-filter: var(--card-blur);
+    border: 0.5px solid var(--card-border);
+    box-shadow: var(--card-shadow);
+    border-radius: 13px;
+    padding: 10px 4px 9px;
+    text-align: center;
+    transition: transform .25s var(--ease-squircle), box-shadow .25s ease, background .25s ease;
+  }
+  .widget-card:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 20px -2px rgba(0, 0, 0, 0.07), inset 0 1px 1px 0 rgba(255, 255, 255, 0.8);
+  }
+  .widget-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    padding: 0 4px;
+  }
+  .widget-value {
+    display: block;
+    margin-top: 4px;
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+  .widget-card.event .widget-value {
+    color: var(--accent);
+  }
+
+  /* ---------- 底部时间与药丸日签 ---------- */
+  .footer {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 0.5px solid var(--hairline);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .range {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .today-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 3px 10px;
+    letter-spacing: .02em;
+  }
+
+  /* ================= 日历视图 ================= */
+  #view-calendar {
+    background: var(--card-bg);
+    backdrop-filter: var(--card-blur);
+    -webkit-backdrop-filter: var(--card-blur);
+    border: 0.5px solid var(--card-border);
+    box-shadow: var(--card-shadow);
+    border-radius: 18px;
+    padding: 16px 12px 14px;
+  }
+  .cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 0 4px;
+  }
+  .cal-title { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .cal-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .cal-nav { display: flex; gap: 6px; }
+  .cal-nav button {
+    appearance: none;
+    border: 0.5px solid var(--hairline);
+    background: var(--surface);
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background-color .15s ease;
+  }
+  .cal-nav button:hover { background: var(--surface-elevated); }
+
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-dow {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    padding: 4px 0 6px;
+  }
+  .cal-cell {
+    position: relative;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    border-radius: 50%;
+    font-variant-numeric: tabular-nums;
+  }
+  .cal-cell.empty { visibility: hidden; }
+  .cal-cell.today {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 6px var(--accent-glow);
+  }
+  .cal-cell.hol { color: var(--holiday-red); font-weight: 600; }
+  .cal-cell.makeup { color: var(--accent); font-weight: 600; }
+  .cal-cell .tag {
+    position: absolute;
+    bottom: 1px;
+    font-size: 8px;
+    line-height: 1;
+    transform: scale(.85);
+    color: inherit;
+    opacity: .9;
+  }
+  .cal-cell.today .tag { color: #fff; }
+
+  .cal-legend {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--hairline);
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  .cal-legend i {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .lg-hol { background: var(--holiday-red); }
+  .lg-makeup { background: var(--accent); }
+  .lg-today { background: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="view-switch">
+      <button id="tab-down" class="on">倒计时</button>
+      <button id="tab-cal">日历</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="settings" id="open-float" title="在网页上直接展示透视毛玻璃小部件 (Alt+W)" style="color:var(--accent);font-weight:600">悬浮透视 ↗</button>
+      <button class="settings" id="open-options">偏好设置</button>
+    </div>
+  </div>
+
+  <!-- 倒计时视图 -->
+  <div class="view on" id="view-down">
+    <div class="status-badge-wrap">
+      <span class="status-dot"></span>
+      <div class="eyebrow" id="status">距离下班还有</div>
+    </div>
+    <div class="countdown" id="countdown">--:--:--</div>
+
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-text" id="progress-text">0%</div>
+    </div>
+
+    <!-- 今日收益特别推荐组件（若开启则以优雅胶囊卡展示，避免挤压其他小组件） -->
+    <div class="income-banner-card" id="income-card" style="display:none;">
+      <div class="income-label-wrap">
+        <span>💰</span>
+        <span id="income-label">今日已获得收益</span>
+      </div>
+      <div class="income-val" id="income-value">¥ 0.00</div>
+    </div>
+
+    <!-- 本周剩余工时横幅 -->
+    <div class="income-banner-card" id="week-card" style="display:none;">
+      <div class="income-label-wrap">
+        <span>🗓️</span>
+        <span id="week-label">本周剩余工时</span>
+      </div>
+      <div class="income-val" id="week-value">0 小时</div>
+    </div>
+
+    <!-- 小组件网格 -->
+    <div class="cards-grid" id="cards-grid"></div>
+
+    <div class="footer">
+      <span class="range" id="range">工作日 09:00 – 18:00</span>
+      <span class="today-tag" id="today-tag" style="display:none;"></span>
+    </div>
+  </div>
+
+  <!-- 日历视图 -->
+  <div class="view" id="view-cal">
+    <div class="cal-head">
+      <div>
+        <div class="cal-title" id="cal-title">2026 年 8 月</div>
+        <div class="cal-sub" id="cal-sub">法定假与调休概览</div>
+      </div>
+      <div class="cal-nav">
+        <button id="cal-prev" title="上个月">‹</button>
+        <button id="cal-next" title="下个月">›</button>
+      </div>
+    </div>
+
+    <div class="cal-grid" id="cal-grid"></div>
+
+    <div class="cal-legend">
+      <span><i class="lg-hol"></i>法定假</span>
+      <span><i class="lg-makeup"></i>调休补班</span>
+      <span><i class="lg-today"></i>今天</span>
+    </div>
+  </div>
+
+<script src="theme.js"></script>
+<script src="core.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>设置 — 下班倒计时</title>
+<style>
+  :root {
+    --bg: #F5F5F7;
+    --bg-material: rgba(245, 245, 247, 0.58);
+    --bg-card: #FFFFFF;
+    --bg-group: #FFFFFF;
+    --text-primary: #1D1D1F;
+    --text-secondary: #86868B;
+    --accent: #0071E3;
+    --accent-soft: rgba(0, 113, 227, 0.12);
+    --border: rgba(0, 0, 0, 0.08);
+    --hairline: rgba(0, 0, 0, 0.06);
+    --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg-material);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+                 "HarmonyOS Sans SC", "Segoe UI", system-ui, sans-serif;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    padding: 60px 20px 80px;
+    transition: background .2s var(--ease), color .2s var(--ease);
+  }
+  .wrap { max-width: 580px; margin: 0 auto; position: relative; }
+
+  /* 顶部动态无感自动同步微状态 (iOS iCloud Style) */
+  .sync-indicator {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 0.5px solid var(--hairline);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    transition: opacity .25s var(--ease), transform .25s var(--ease);
+    z-index: 999;
+  }
+  .sync-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #34C759;
+    box-shadow: 0 0 6px rgba(52, 199, 89, 0.6);
+    transition: background .2s ease;
+  }
+  .sync-indicator.saving .sync-dot {
+    background: #FF9500;
+    box-shadow: 0 0 6px rgba(255, 149, 0, 0.6);
+  }
+
+  h1 {
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-align: center;
+  }
+  .sub {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  /* ---------- 设置分组（iOS 风） ---------- */
+  .group {
+    margin-top: 56px;
+    background: var(--card-bg, var(--bg-group));
+    backdrop-filter: var(--card-blur, blur(16px));
+    -webkit-backdrop-filter: var(--card-blur, blur(16px));
+    border: 0.5px solid var(--card-border, var(--hairline));
+    box-shadow: var(--card-shadow, 0 4px 20px rgba(0,0,0,0.03));
+    border-radius: 18px;
+    padding: 4px 20px;
+    transition: background .2s ease, border-color .2s ease;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .row:last-child { border-bottom: none; }
+  .row-label { width: 88px; flex-shrink: 0; font-size: 17px; }
+  .row-body  { flex: 1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* 工作日胶囊 */
+  .chip {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1;
+    padding: 8px 14px;
+    border-radius: 980px;
+    cursor: pointer;
+    transition: all .15s var(--ease);
+  }
+  .chip:hover { background: rgba(0, 0, 0, 0.04); }
+  .chip.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* 输入框：圆角 12px、1px 边框 */
+  input[type="time"], input[type="number"] {
+    appearance: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 15px;
+    padding: 9px 12px;
+    outline: none;
+    transition: box-shadow .15s var(--ease), border-color .15s var(--ease);
+    font-variant-numeric: tabular-nums;
+  }
+  input[type="time"] { width: 118px; }
+  input[type="number"] { width: 96px; }
+  input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.18);
+  }
+  .unit { font-size: 15px; color: var(--text-secondary); }
+
+  /* 下拉选择 */
+  .select {
+    appearance: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2386868B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 15px;
+    padding: 9px 32px 9px 12px;
+    outline: none;
+    cursor: pointer;
+    transition: box-shadow .15s var(--ease), border-color .15s var(--ease);
+  }
+  .select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.18);
+  }
+
+  /* 皮肤调色板与纹理网格 */
+  .skin-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    width: 100%;
+  }
+  .skin-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 6px;
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all .2s var(--ease);
+    user-select: none;
+  }
+  .skin-card:hover {
+    border-color: var(--text-secondary);
+    transform: translateY(-1px);
+  }
+  .skin-card.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    background: var(--accent-soft);
+  }
+  .skin-ring {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--hairline), 0 2px 4px rgba(0,0,0,0.06);
+    flex-shrink: 0;
+  }
+  .skin-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .skin-sub {
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  /* 纹理单选胶囊 */
+  .texture-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .texture-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 980px;
+    font-size: 13px;
+    background: #fff;
+    cursor: pointer;
+    transition: all .2s var(--ease);
+    color: var(--text);
+  }
+  .texture-chip:hover {
+    border-color: var(--text-secondary);
+  }
+  .texture-chip.active {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* 卡片排序编辑器 */
+  .card-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 6px;
+  }
+  .card-row .name { flex: 1; font-size: 14px; }
+  .card-row button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    transition: background-color .15s var(--ease);
+  }
+  .card-row button:hover { background: rgba(0, 0, 0, 0.05); }
+  .card-row button.hidden-eye { opacity: .35; }
+
+  /* 倒数日列表 */
+  .event-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .event-item .ev-name-text { font-weight: 500; }
+  .event-item .ev-date-text { color: var(--text-secondary); font-size: 13px; flex:1; }
+  .event-item .del { color: #E30000; }
+
+  /* iOS 式开关 */
+  .switch { position: relative; display: inline-block; width: 44px; height: 26px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 980px;
+    cursor: pointer;
+    transition: background-color .2s var(--ease);
+  }
+  .slider::before {
+    content: "";
+    position: absolute;
+    left: 2px; top: 2px;
+    width: 22px; height: 22px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    transition: transform .2s var(--ease);
+  }
+  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(18px); }
+
+  /* ---------- 主按钮：胶囊形 ---------- */
+  .actions { margin-top: 48px; text-align: center; }
+  .btn-primary {
+    appearance: none;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 17px;
+    line-height: 1;
+    padding: 14px 42px;
+    border-radius: 980px;
+    cursor: pointer;
+    transition: opacity .15s var(--ease), transform .15s var(--ease);
+  }
+  .btn-primary:hover { opacity: .9; }
+  .btn-primary:active { transform: scale(.98); }
+
+  .toast {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity .25s var(--ease);
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="sync-indicator" id="sync-indicator">
+  <span class="sync-dot"></span>
+  <span id="sync-text">所有配置实时同步已就绪</span>
+</div>
+
+<div class="wrap">
+  <h1>偏好设置</h1>
+  <p class="sub">遵循 iOS 人机交互规范 · 实时静默自动保存</p>
+
+  <section class="group">
+    <div class="row">
+      <div class="row-label">工作日</div>
+      <div class="row-body" id="workdays"></div>
+    </div>
+    <div class="row">
+      <div class="row-label">工作时间</div>
+      <div class="row-body">
+        <input type="time" id="start" value="09:00">
+        <span class="unit">至</span>
+        <input type="time" id="end" value="18:00">
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">发薪日</div>
+      <div class="row-body">
+        <span class="unit">每月</span>
+        <input type="number" id="payday" min="1" max="31" value="15">
+        <span class="unit">日</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">收入</div>
+      <div class="row-body" style="flex-direction:column;align-items:flex-start;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <select id="incomeMode" class="select">
+            <option value="daily">按日薪</option>
+            <option value="monthly">按月薪折算</option>
+          </select>
+          <span id="daily-input-wrap" style="display:flex;align-items:center;gap:6px">
+            <span class="unit">¥</span>
+            <input type="number" id="income" min="0" step="10" value="300">
+            <span class="unit">／天</span>
+          </span>
+          <span id="monthly-input-wrap" style="display:none;align-items:center;gap:6px">
+            <span class="unit">月薪 ¥</span>
+            <input type="number" id="salary" min="0" step="100" value="6500">
+            <span class="unit">÷ 当月应上班天数</span>
+          </span>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary)">
+          <label class="switch" style="width:38px;height:22px">
+            <input type="checkbox" id="probation">
+            <span class="slider"></span>
+          </label>
+          试用期 · 按 80% 计发
+        </label>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">今天赚了</div>
+      <div class="row-body">
+        <label class="switch">
+          <input type="checkbox" id="showIncome" checked>
+          <span class="slider"></span>
+        </label>
+        <span class="unit" style="margin-left:auto">在弹窗中显示该统计位</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">本周剩余</div>
+      <div class="row-body">
+        <label class="switch">
+          <input type="checkbox" id="showWeek" checked>
+          <span class="slider"></span>
+        </label>
+        <span class="unit" style="margin-left:auto">显示「本周剩余工时」横幅</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">图标角标</div>
+      <div class="row-body">
+        <label class="switch">
+          <input type="checkbox" id="showBadge" checked>
+          <span class="slider"></span>
+        </label>
+        <span class="unit" style="margin-left:auto">工具栏图标显示剩余时间</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">下班提醒</div>
+      <div class="row-body">
+        <label class="switch">
+          <input type="checkbox" id="notifyBeforeOff" checked>
+          <span class="slider"></span>
+        </label>
+        <span class="unit">提前 30 分钟</span>
+        <label class="switch" style="margin-left:18px">
+          <input type="checkbox" id="notifyAtOff" checked>
+          <span class="slider"></span>
+        </label>
+        <span class="unit">到点提醒</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">专注模式</div>
+      <div class="row-body" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <label class="switch">
+            <input type="checkbox" id="focusEnabled">
+            <span class="slider"></span>
+          </label>
+          <span class="unit">勿扰时段内静音所有提醒（开会 / 深度工作）</span>
+        </div>
+        <div id="focus-time-wrap" style="display:none;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="unit">从</span>
+          <input type="time" id="focusStart" value="12:00">
+          <span class="unit">至</span>
+          <input type="time" id="focusEnd" value="14:00">
+          <span class="unit" style="font-size:13px">支持跨午夜（如 22:00 → 06:00）</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 外观与个性化 -->
+  <section class="group">
+    <div class="row">
+      <div class="row-label">个性皮肤</div>
+      <div class="row-body" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div class="skin-grid" id="skin-grid"></div>
+        <span class="unit" style="font-size:12px">源自 Apple 2026 HIG 色阶系统，深色与浅色自适应校正</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">背景纹理</div>
+      <div class="row-body">
+        <div class="texture-chips" id="texture-chips">
+          <button type="button" class="texture-chip" data-tex="none">纯净平面</button>
+          <button type="button" class="texture-chip" data-tex="dots">精密点阵</button>
+          <button type="button" class="texture-chip" data-tex="noise">亚光微噪</button>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">卡片玻璃</div>
+      <div class="row-body" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <input type="range" id="glassOpacity" min="0" max="100" step="5" value="65" 
+                 style="flex:1;accent-color:var(--accent);height:6px;cursor:pointer">
+          <span class="unit" id="glassOpacityVal" style="font-weight:600;min-width:95px;text-align:right;color:var(--text-primary);font-variant-numeric:tabular-nums">
+            65% (透润)
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary)">
+          <span>0% 完全隐形全透</span>
+          <span>65% 经典毛玻璃 (推荐)</span>
+          <span>100% 实体纯色</span>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">明暗方案</div>
+      <div class="row-body">
+        <select id="theme" class="select">
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
+          <option value="auto">跟随系统</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">卡片排序</div>
+      <div class="row-body" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div id="cards-editor"></div>
+        <span class="unit" style="font-size:12px">↑↓ 调整顺序 · 眼睛 控制显隐（「今天赚了」受上方开关控制）</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 自定义倒数日 -->
+  <section class="group">
+    <div class="row">
+      <div class="row-label">倒数日</div>
+      <div class="row-body" style="flex-direction:column;align-items:stretch;gap:10px">
+        <div id="events-list"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="ev-name" placeholder="名称，如：生日" maxlength="10"
+                 style="flex:1;min-width:90px;border:1px solid var(--border);border-radius:12px;padding:9px 12px;font-size:15px;font-family:inherit;outline:none;background:#fff;color:var(--text-primary)">
+          <input type="date" id="ev-date" style="border:1px solid var(--border);border-radius:12px;padding:8px 10px;font-size:15px;font-family:inherit;background:#fff;color:var(--text-primary)">
+          <button class="chip" id="ev-add">添加</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="unit" style="font-size:13px">显示在</span>
+          <select id="eventSlot" class="select">
+            <option value="holiday">节日卡位置</option>
+            <option value="friday">周五卡位置</option>
+            <option value="payday">发薪卡位置</option>
+            <option value="none">追加到末尾</option>
+          </select>
+          <span class="unit" style="font-size:13px">；每年重复 →</span>
+          <span id="ev-repeat-hint"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 节假日数据源 -->
+  <section class="group">
+    <div class="row">
+      <div class="row-label">节假日数据</div>
+      <div class="row-body" style="flex-direction:column;align-items:flex-start;gap:6px">
+        <span class="unit" id="holiday-status">内置 2026 年官方数据（国办发明电〔2025〕7号）</span>
+        <span class="unit" style="font-size:13px" id="holiday-sub">联网后每日自动检查更新 · 数据源 holiday-cn</span>
+      </div>
+      <button class="chip" id="sync-now" style="flex-shrink:0">立即更新</button>
+    </div>
+  </section>
+
+  <div class="actions">
+    <div style="display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap">
+      <button class="btn-primary" id="save" style="display:none">保存设置</button>
+      <button type="button" class="chip" id="reset-default" style="padding:10px 24px;border-radius:980px;color:var(--text-secondary)">恢复出厂设置</button>
+    </div>
+    <p class="toast" id="toast" style="opacity:1;color:var(--text-secondary);margin-top:14px;font-size:13px">✦ 所有配置均已实时静默生效，无需手动保存</p>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script src="core.js"></script>
+<script src="options.js"></script>
+</body>
+</html>
