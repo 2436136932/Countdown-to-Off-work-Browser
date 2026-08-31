@@ -1,6 +1,9 @@
 (function() {
   'use strict';
 
+  // 在 iframe 内不创建悬浮岛，避免公司邮箱等内嵌 iframe 页面出现重复实例
+  if (window.top !== window.self) return;
+
   // 避免在同一个页面重复注入
   if (window.__OFFWORK_COUNTDOWN_ISLAND_INJECTED__) return;
   window.__OFFWORK_COUNTDOWN_ISLAND_INJECTED__ = true;
@@ -23,11 +26,19 @@
   // 1. 初始化 Shadow DOM 容器（完全隔离宿主网页的样式）
   function setupDOM() {
     if (shadowHost) return;
+    // DOM 强防御：若页面已有 host 节点，复用之（极端边界情况下防重复创建）
+    const existingHost = document.getElementById('__offwork_countdown_island_host__');
+    if (existingHost) {
+      shadowHost = existingHost;
+      shadowRoot = existingHost.shadowRoot || existingHost.attachShadow({ mode: 'open' });
+      islandEl = shadowRoot && shadowRoot.getElementById('apple-vibrancy-island');
+      return;
+    }
 
     shadowHost = document.createElement('div');
     shadowHost.id = '__offwork_countdown_island_host__';
     shadowHost.style.cssText = 'position:fixed;z-index:2147483647;top:0;left:0;width:0;height:0;pointer-events:none;';
-    
+
     // 挂载到 html 或 body
     (document.fullscreenElement || document.body || document.documentElement).appendChild(shadowHost);
     shadowRoot = shadowHost.attachShadow({ mode: 'open' });
@@ -139,6 +150,25 @@
       }
       .dark .close-btn { background: rgba(255, 255, 255, 0.1); }
       .dark .close-btn:hover { background: rgba(255, 255, 255, 0.2); }
+
+      /* 摸鱼兽聊天唤起按钮 */
+      .pet-btn {
+        background: rgba(0, 0, 0, 0.05);
+        border: none;
+        font-size: 13px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all .2s ease;
+        margin-right: 2px;
+      }
+      .pet-btn:hover { background: rgba(0, 122, 255, 0.15); transform: scale(1.08); }
+      .dark .pet-btn { background: rgba(255, 255, 255, 0.1); }
+      .dark .pet-btn:hover { background: rgba(10, 132, 255, 0.3); }
 
       /* 核心倒计时数字区 */
       .time-row {
@@ -256,6 +286,7 @@
       <div class="island-header" id="drag-handle">
         <div style="width:20px"></div>
         <div class="handle-pill"></div>
+        <button class="pet-btn" id="open-pet" title="和摸鱼兽聊天 (Alt+P)">🐾</button>
         <button class="close-btn" id="close-island" title="收起 (Alt+W)">✕</button>
       </div>
 
@@ -296,12 +327,18 @@
     // 绑定关闭
     shadowRoot.getElementById('close-island').addEventListener('click', hideIsland);
 
+    // 绑定摸鱼兽聊天唤起：走 background 转发路径（动态注入 content_pet.js 兜底）
+    shadowRoot.getElementById('open-pet').addEventListener('click', () => {
+      try {
+        chrome.runtime.sendMessage({ type: 'show-pet-widget' }, () => void chrome.runtime.lastError);
+      } catch {}
+    });
+
     // 绑定拖拽（整个面板可拖，含胶囊形态）
     setupDrag(island);
 
     // 双击：在完整岛与顶部胶囊形态之间切换
-    island.addEventListener('dblclick', (e) => {
-      e.preventDefault();
+    island.addEventListener('dblclick', () => {
       island.classList.toggle('mini');
       tick();
     });
@@ -314,9 +351,9 @@
     let origTop = 0, origLeft = 0;
 
     panel.addEventListener('mousedown', (e) => {
-      // 关闭按钮不触发拖拽
-      if (e.target && e.target.closest && e.target.closest('.close-btn')) return;
-      // 双击切换胶囊形态时不触发拖拽（双击时两次 mousedown 几乎无位移，可忽略）
+      // 输入框、按钮等交互元素不触发拖拽（保证可点击、可聚焦）
+      const t = e.target;
+      if (t && t.closest && (t.closest('input') || t.closest('button') || t.closest('a') || t.closest('select') || t.closest('textarea'))) return;
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
@@ -442,7 +479,11 @@
       // 渲染小方块（发薪、周五、节假日、自定义纪念日）
       const grid = shadowRoot.getElementById('isl-grid');
       const cardList = [];
-      const activeKeys = (currentCfg.cards || ['payday', 'friday', 'holiday']).filter(k => k !== 'income');
+      // cfg.cards 兜底：undefined/null/空数组都 fallback 到默认 4 项
+      const cardsArr = (Array.isArray(currentCfg.cards) && currentCfg.cards.length > 0)
+        ? currentCfg.cards
+        : ['payday', 'friday', 'holiday', 'income'];
+      const activeKeys = cardsArr.filter(k => k !== 'income');
       activeKeys.forEach(k => {
         if (snap.cards && snap.cards[k]) {
           cardList.push({ label: snap.cards[k].label, value: snap.cards[k].value, unit: snap.cards[k].unit });
@@ -453,6 +494,12 @@
       }
 
       grid.innerHTML = '';
+      // 兜底：若仍为空，强制渲染 3 个默认小方块（避免 grid 全空让用户以为功能坏了）
+      if (cardList.length === 0 && snap.cards) {
+        ['payday', 'friday', 'holiday'].forEach(k => {
+          if (snap.cards[k]) cardList.push(snap.cards[k]);
+        });
+      }
       cardList.slice(0, 4).forEach(item => {
         const tile = document.createElement('div');
         tile.className = 'mini-tile';

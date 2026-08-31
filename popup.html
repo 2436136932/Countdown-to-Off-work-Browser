@@ -82,6 +82,7 @@
     font-weight: 500;
     line-height: 1;
     padding: 5px 14px;
+    white-space: nowrap;
     border-radius: 999px;
     color: var(--text-secondary);
     cursor: pointer;
@@ -405,9 +406,9 @@
       <button id="tab-down" class="on">倒计时</button>
       <button id="tab-cal">日历</button>
     </div>
-    <div style="display:flex;gap:6px;align-items:center;">
-      <button class="settings" id="open-float" title="在网页上直接展示透视毛玻璃小部件 (Alt+W)" style="color:var(--accent);font-weight:600">悬浮透视 ↗</button>
-      <button class="settings" id="open-options">偏好设置</button>
+    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+      <button class="settings" id="open-float" title="在网页上直接展示透视毛玻璃小部件 (Alt+W)" style="color:var(--accent);font-weight:600;white-space:nowrap">悬浮 ↗</button>
+      <button class="settings" id="open-options" style="white-space:nowrap">设置</button>
     </div>
   </div>
 

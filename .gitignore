@@ -16,4 +16,7 @@ pack.js
 repack.js
 test-core-*.js
 offwork-countdown.zip
+# 废弃的独立页面版宠物（已被 content_pet.js 取代）
+pet.html
+pet.js
 

@@ -47,6 +47,13 @@ async function doSave() {
       focusStart: $('focusStart').value || '12:00',
       focusEnd: $('focusEnd').value || '14:00',
       showWeek: $('showWeek').checked,
+      petEnabled: $('petEnabled').checked,
+      llmUrl: $('llmUrl').value.trim() || '',
+      llmKey: $('llmKey').value.trim() || '',
+      llmModel: $('llmModel').value || '',
+      llmTemperature: Math.min(1.5, Math.max(0, Number($('llmTemperature').value) || 0.9)),
+    petPrompt: ($('petPrompt') && $('petPrompt').value.trim()) || '',
+      petPrompt: ($('petPrompt') && $('petPrompt').value.trim()) || '',
       theme: $('theme').value,
       skin: currentSkin,
       texture: currentTexture,
@@ -289,6 +296,88 @@ $('focusEnabled')?.addEventListener('change', () => {
   autoSave(0);
 });
 
+/* ---------- 摸鱼宠物（大模型吐槽） ---------- */
+function syncPetUI() {
+  const on = !!($('petEnabled') && $('petEnabled').checked);
+  $('llm-config-wrap').style.display = on ? 'flex' : 'none';
+}
+$('petEnabled')?.addEventListener('change', () => {
+  syncPetUI();
+  autoSave(0);
+});
+
+$('llmTemperature')?.addEventListener('input', (e) => {
+  const v = Math.min(1.5, Math.max(0, Number(e.target.value) || 0.9));
+  $('llmTemperatureVal').textContent = v.toFixed(1);
+  autoSave(120);
+});
+
+$('petPrompt')?.addEventListener('input', () => autoSave(300));
+
+/** 自动获取模型列表 */
+async function refreshLlmModels(silent) {
+  const url = ($('llmUrl').value || '').trim();
+  const key = ($('llmKey').value || '').trim();
+  const sel = $('llmModel');
+  if (!url || !key) {
+    if (!silent) $('llm-test-result').textContent = '请先填写 API 地址与 Key';
+    return;
+  }
+  sel.innerHTML = '<option value="">加载中…</option>';
+  try {
+    const resp = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'pet-list-models', url, key }, reply => {
+        if (chrome.runtime.lastError) resolve({ ok: false, error: chrome.runtime.lastError.message });
+        else resolve(reply || {});
+      });
+    });
+    if (!resp.ok || !Array.isArray(resp.models) || !resp.models.length) {
+      sel.innerHTML = '<option value="">自动获取失败，可手动输入</option>';
+      if (!silent) $('llm-test-result').textContent = '模型获取失败：' + (resp.error || '空列表');
+      return;
+    }
+    sel.innerHTML = '';
+    resp.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      sel.appendChild(opt);
+    });
+    if (!silent) $('llm-test-result').textContent = `已获取 ${resp.models.length} 个模型`;
+    autoSave(0);
+  } catch (err) {
+    sel.innerHTML = '<option value="">自动获取失败，可手动输入</option>';
+    if (!silent) $('llm-test-result').textContent = '请求失败：' + err.message;
+  }
+}
+$('llm-refresh-models')?.addEventListener('click', () => refreshLlmModels(false));
+
+/** 测试吐槽 */
+$('llm-test')?.addEventListener('click', async () => {
+  const btn = $('llm-test');
+  const out = $('llm-test-result');
+  btn.disabled = true;
+  btn.textContent = '摸鱼兽思考中…';
+  out.textContent = '';
+  try {
+    const resp = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'pet-say',
+        context: { dow: new Date().getDay(), desc: '测试：现在是工作日午休刚结束，还剩 4 小时下班', afternoon: true },
+      }, reply => {
+        if (chrome.runtime.lastError) resolve({ ok: false, error: chrome.runtime.lastError.message });
+        else resolve(reply || {});
+      });
+    });
+    out.textContent = resp.ok ? `「${resp.text}」` : ('调用失败，已用内置吐槽：' + (resp.text || resp.error || ''));
+  } catch (err) {
+    out.textContent = '调用异常：' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '测试吐槽 🐾';
+  }
+});
+
 /* ---------- 工作日胶囊 ---------- */
 function renderChips() {
   const box = $('workdays');
@@ -325,6 +414,15 @@ async function init() {
   $('focusStart').value = cfg.focusStart || '12:00';
   $('focusEnd').value = cfg.focusEnd || '14:00';
   $('showWeek').checked = cfg.showWeek !== false;
+  $('petEnabled').checked = !!cfg.petEnabled;
+  $('llmUrl').value = cfg.llmUrl || '';
+  $('llmKey').value = cfg.llmKey || '';
+  $('llmModel').value = cfg.llmModel || '';
+  const llmTemp = Math.min(1.5, Math.max(0, Number(cfg.llmTemperature) || 0.9));
+  $('llmTemperature').value = llmTemp;
+  $('llmTemperatureVal').textContent = llmTemp.toFixed(1);
+  if ($('petPrompt')) $('petPrompt').value = cfg.petPrompt || '';
+  syncPetUI();
   syncFocusTimeUI();
   $('theme').value = cfg.theme || 'light';
   $('eventSlot').value = cfg.eventSlot || 'holiday';
@@ -352,6 +450,7 @@ async function init() {
   renderChips();
   renderCardsEditor();
   renderEvents();
+  if (cfg.llmUrl && cfg.llmKey) refreshLlmModels(true);
 }
 
 $('glassOpacity')?.addEventListener('input', (e) => {
@@ -386,6 +485,12 @@ $('save').addEventListener('click', async () => {
     focusStart: $('focusStart').value || '12:00',
     focusEnd: $('focusEnd').value || '14:00',
     showWeek: $('showWeek').checked,
+    petEnabled: $('petEnabled').checked,
+    llmUrl: $('llmUrl').value.trim() || '',
+    llmKey: $('llmKey').value.trim() || '',
+    llmModel: $('llmModel').value || '',
+    llmTemperature: Math.min(1.5, Math.max(0, Number($('llmTemperature').value) || 0.9)),
+    petPrompt: ($('petPrompt') && $('petPrompt').value.trim()) || '',
     theme: $('theme').value,
     skin: currentSkin,
     texture: currentTexture,
@@ -468,6 +573,10 @@ $('reset-default')?.addEventListener('click', async () => {
   $(id)?.addEventListener('change', () => autoSave(0));
 });
 
-['probation', 'showIncome', 'showWeek', 'showBadge', 'notifyBeforeOff', 'notifyAtOff'].forEach(id => {
+['probation', 'showIncome', 'showWeek', 'showBadge', 'notifyBeforeOff', 'notifyAtOff', 'petEnabled'].forEach(id => {
   $(id)?.addEventListener('change', () => autoSave(0));
+});
+
+['llmUrl', 'llmKey'].forEach(id => {
+  $(id)?.addEventListener('input', () => autoSave(400));
 });

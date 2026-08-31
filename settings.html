@@ -2,6 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>设置 — 下班倒计时</title>
 <style>
   :root {
@@ -146,20 +149,44 @@
   /* 下拉选择 */
   .select {
     appearance: none;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: #fff url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2386868B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+    -webkit-appearance: none;
+    border: 0.5px solid var(--hairline);
+    border-radius: 14px;
+    background-color: var(--card-bg, rgba(255,255,255,0.5));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    /* 自定义苹果风箭头 */
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2386868B' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 10px 6px;
     color: var(--text-primary);
     font-family: inherit;
-    font-size: 15px;
-    padding: 9px 32px 9px 12px;
+    font-size: 14px;
+    line-height: 1.4;
+    padding: 11px 36px 11px 14px;
     outline: none;
     cursor: pointer;
-    transition: box-shadow .15s var(--ease), border-color .15s var(--ease);
+    transition: box-shadow .2s var(--ease), border-color .2s var(--ease), background-color .2s var(--ease);
+    font-feature-settings: 'tnum';
+    min-height: 38px;
+    letter-spacing: -0.01em;
   }
+  .select:hover { border-color: var(--accent-soft); }
   .select:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.18);
+    box-shadow: 0 0 0 3.5px var(--accent-soft);
+    background-color: var(--card-bg, rgba(255,255,255,0.7));
+  }
+  /* 让系统下拉高亮/选中跟随主题色 */
+  .select { accent-color: var(--accent); }
+  /* option 局部样式：Chromium 系可定制 padding/font */
+  .select option {
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-primary);
+    background-color: var(--bg-card, #fff);
+    padding: 10px 14px;
   }
 
   /* 皮肤调色板与纹理网格 */
@@ -331,6 +358,28 @@
     pointer-events: none;
   }
   .toast.show { opacity: 1; }
+
+  /* 摸鱼兽人设提示词 textarea：苹果风 focus 微光效 */
+  #petPrompt::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.75;
+    white-space: pre-wrap;
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+  #petPrompt:hover { border-color: var(--accent-soft); }
+  #petPrompt:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3.5px var(--accent-soft);
+    background-color: var(--card-bg, rgba(255,255,255,0.7));
+  }
+  /* 滚动条美化 */
+  #petPrompt::-webkit-scrollbar { width: 6px; }
+  #petPrompt::-webkit-scrollbar-thumb {
+    background: rgba(120,120,128,0.3);
+    border-radius: 3px;
+  }
+  #petPrompt::-webkit-scrollbar-thumb:hover { background: rgba(120,120,128,0.5); }
 </style>
 </head>
 <body>
@@ -510,6 +559,56 @@
       <div class="row-body" style="flex-direction:column;align-items:stretch;gap:6px">
         <div id="cards-editor"></div>
         <span class="unit" style="font-size:12px">↑↓ 调整顺序 · 眼睛 控制显隐（「今天赚了」受上方开关控制）</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 摸鱼宠物（AI 大模型吐槽） -->
+  <section class="group">
+    <div class="row">
+      <div class="row-label">摸鱼宠物</div>
+      <div class="row-body" style="flex-direction:column;align-items:stretch;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <label class="switch">
+            <input type="checkbox" id="petEnabled">
+            <span class="slider"></span>
+          </label>
+          <span class="unit">开启「摸鱼兽」电子宠物（悬浮岛显示并随机吐槽）</span>
+        </div>
+        <div id="llm-config-wrap" style="display:none;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="unit" style="min-width:64px">API 地址</span>
+            <input type="text" id="llmUrl" placeholder="https://api.deepseek.com/v1  (OpenAI 兼容)" style="flex:1;min-width:200px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="unit" style="min-width:64px">API Key</span>
+            <input type="password" id="llmKey" placeholder="sk-..." style="flex:1;min-width:200px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="unit" style="min-width:64px">模型</span>
+            <select id="llmModel" class="select" style="flex:1;min-width:160px">
+              <option value="">自动获取…</option>
+            </select>
+            <button type="button" class="chip" id="llm-refresh-models" style="flex-shrink:0">刷新</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span class="unit" style="min-width:64px">温度</span>
+            <input type="range" id="llmTemperature" min="0" max="1.5" step="0.1" value="0.9" style="flex:1;max-width:220px;accent-color:var(--accent);cursor:pointer">
+            <span class="unit" id="llmTemperatureVal" style="font-weight:600;min-width:56px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-primary)">0.9</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button type="button" class="chip" id="llm-test" style="flex-shrink:0">测试吐槽 🐾</button>
+            <span class="unit" id="llm-test-result" style="font-size:13px"></span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span class="unit" style="min-width:64px">人设提示词 <span style="opacity:.6">(可自定义性格，留空用默认摸鱼兽)</span></span>
+            <textarea id="petPrompt" rows="6" maxlength="500"
+              placeholder="例：你是一只傲娇的橘猫，毒舌但心软，口头禅是「喵了个咪的」，说话不超过20字，偶尔用日语吐槽…&#10;&#10;留空 → 用默认摸鱼兽人设&#10;填写后 → 300ms 自动保存，按 Enter 可换行"
+              style="width:100%;border:0.5px solid var(--hairline);border-radius:16px;padding:14px 16px;font-size:14px;font-family:inherit;line-height:1.7;outline:none;background:var(--card-bg,rgba(255,255,255,0.5));backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--text-primary);resize:none;box-sizing:border-box;transition:border-color .2s ease,box-shadow .2s ease,background-color .2s ease;-webkit-appearance:none;font-feature-settings:'tnum';letter-spacing:-0.01em;"></textarea>
+            <span class="unit" style="font-size:12px">自定义人设会覆盖默认摸鱼兽人设，让宠物按你的设定回答问题；改动自动保存。</span>
+          </div>
+          <span class="unit" style="font-size:12px">未配置 API 时自动使用内置吐槽池；Key 仅保存在本地浏览器，绝不上传。</span>
+        </div>
       </div>
     </div>
   </section>

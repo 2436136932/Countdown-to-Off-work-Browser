@@ -207,19 +207,25 @@ $('open-float')?.addEventListener('click', async () => {
       await chrome.tabs.sendMessage(tab.id, { action: 'toggle-float-widget' });
       window.close();
     } catch {
-      // 若当前 tab 尚未注入 content script（比如在扩展更新前打开的网页），动态注入
+      // 若当前 tab 尚未注入 content script（比如在扩展更新前打开的网页），只注入 content.js
+      // CORE/THEME 已在页面里（manifest 条目 1 提供），避免重复声明 SyntaxError
       if (chrome.scripting && chrome.scripting.executeScript) {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['core.js', 'theme.js', 'content.js']
-        });
-        // 注入完成后再次发送唤起消息
-        setTimeout(async () => {
-          try {
-            await chrome.tabs.sendMessage(tab.id, { action: 'toggle-float-widget' });
-          } catch {}
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          });
+          setTimeout(async () => {
+            try {
+              await chrome.tabs.sendMessage(tab.id, { action: 'toggle-float-widget' });
+            } catch {}
+            window.close();
+          }, 80);
+        } catch {
           window.close();
-        }, 80);
+        }
+      } else {
+        window.close();
       }
     }
   } catch {}

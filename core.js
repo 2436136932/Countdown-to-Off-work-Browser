@@ -27,6 +27,12 @@ const CORE = (() => {
     focusStart: '12:00',         // 勿扰时段开始
     focusEnd: '14:00',           // 勿扰时段结束
     showWeek: true,              // 「本周剩余」横幅开关
+    petEnabled: false,           // 摸鱼电子宠物开关
+    llmUrl: '',                  // 大模型 API Base URL（OpenAI 兼容，如 https://api.deepseek.com/v1）
+    llmKey: '',                  // API Key
+    llmModel: '',                // 模型名（留空则自动获取第一个可用模型）
+    llmTemperature: 0.9,         // 吐槽创造性温度 (0~1.5)
+    petPrompt: '',               // 自定义人设提示词（覆盖默认摸鱼兽人设，留空用默认）
     theme: 'light',              // light | dark | auto（跟随系统）
     skin: 'pro',                 // pro | alpine | sierra | midnight | amber | lilac | sakura | paper
     texture: 'none',             // none | dots | noise
@@ -153,7 +159,19 @@ const CORE = (() => {
   async function loadConfig() {
     try {
       const data = await chrome.storage.sync.get(DEFAULTS);
-      return { ...DEFAULTS, ...data };
+      // 关键：过滤掉 null/undefined，避免 storage 缺失字段时覆盖 DEFAULTS（这是数据全 0 的根因）
+      const merged = { ...DEFAULTS };
+      for (const k of Object.keys(data)) {
+        const v = data[k];
+        if (v === null || v === undefined) continue;
+        // 数组字段必须是数组；字符串不能为空串
+        if (Array.isArray(DEFAULTS[k]) && !Array.isArray(v)) continue;
+        if (typeof DEFAULTS[k] === 'string' && typeof v === 'string' && v.trim() === '') {
+          merged[k] = DEFAULTS[k]; continue;
+        }
+        merged[k] = v;
+      }
+      return merged;
     } catch {
       return { ...DEFAULTS };
     }
