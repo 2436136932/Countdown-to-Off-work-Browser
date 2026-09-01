@@ -221,7 +221,7 @@ chrome.commands.onCommand.addListener(async (command) => {
         if (chrome.scripting && chrome.scripting.executeScript) {
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ['content_pet.js']
+            files: ['xiangqi.js', 'content_pet.js']
           });
           setTimeout(() => {
             chrome.tabs.sendMessage(tab.id, { action: 'toggle-pet-widget' }).catch(() => {});
@@ -256,24 +256,12 @@ chrome.runtime.onStartup.addListener(async () => {
  * 摸鱼电子宠物 — 大模型吐槽引擎
  * OpenAI 兼容接口；未配置或请求失败时自动降级为本地吐槽池。
  * ============================================================ */
-const PET_SYSTEM_PROMPT = `你是一只住在打工人浏览器里的电子摸鱼宠物「摸鱼兽」。
-你的人设：贱萌、会吐槽、偶尔暖心，三句话不离下班/摸鱼/发薪/摸鱼文化，说话简短。
-要求：
-1. 每次只输出一句话，控制在 30 字以内，不要换行、不要引号、不要表情符号。
-2. 结合用户给出的当前情境（星期、时间段、剩余工时、状态）说出符合当下的一句话。
-3. 语气轻松欠揍但不冒犯，偶尔毒鸡汤。
-4. 用户问任何话题都尝试用你的角色口吻回答（即使是技术、严肃、元问题），绝不拒绝或回避；用贱萌方式接住即可。`;
-
-/** 组装最终系统提示词：默认人设 + 用户自定义人设（追加覆盖） */
+/* 完全使用用户在设置里填写的人设提示词，未填写返回 null（不附加 system，裸调模型）。
+   为避免模型偏离，加一句约束引导（不改变人设内容本身）。 */
 function petSystemPrompt(custom) {
   const t = String(custom || '').trim();
-  if (!t) return PET_SYSTEM_PROMPT;
-  return `${PET_SYSTEM_PROMPT}
-
-【用户自定义人设（最高优先级，必须严格遵守）】
-${t}
-
-要求：以上自定义人设与你原有的摸鱼兽身份不冲突时可以融合；发生冲突时以用户自定义人设为准。`;
+  if (!t) return null;
+  return `你以以下设定的角色身份回答，必须严格遵守，任何时候都不偏离该人设：\n\n${t}`;
 }
 
 /** 本地吐槽池：按状态分桶，作为未配置 API / 请求失败的兜底 */
@@ -354,28 +342,47 @@ function localPetChat(userText) {
   return fallback[Math.floor(Math.random() * fallback.length)];
 }
 
-/** 生成吐槽/回复：优先大模型，失败/未配置走本地兜底；userText 存在即为聊天 */
+/** 生成吐槽/回复：优先大模型，失败/未配置走本地兜底；userText 存在即为聊天
+ *  返回 { text, source, error? }：source='llm'|'local'；失败时 error 带原因 */
 async function petSaying(ctx, userText) {
   const cfg = await CORE.loadConfig();
-  const fallback = userText ? localPetChat(userText) : localPetSaying(ctx);
-  if (!cfg.petEnabled || !cfg.llmUrl || !cfg.llmKey) return fallback;
+  const localReply = (err) => ({ text: userText ? localPetChat(userText) : localPetSaying(ctx), source: 'local', error: err });
+  if (!cfg.petEnabled) return localReply('宠物开关未开启');
+  if (!cfg.llmUrl) return localReply('未配置 API 地址');
+  if (!cfg.llmKey) return localReply('未配置 API Key');
   try {
     const base = String(cfg.llmUrl).replace(/\/+$/, '');
-    const messages = [{ role: 'system', content: petSystemPrompt(cfg.petPrompt) }];
-    // 情境上下文
-    if (ctx && ctx.desc) messages.push({ role: 'user', content: `当前情境：${ctx.desc}` });
-    // 多轮对话历史（聊天室）：最近 10 条
+    const messages = [];
+    // 人设（仅配置时附加；未配置则裸调模型）
+    const sysPrompt = petSystemPrompt(cfg.petPrompt);
+    if (sysPrompt) messages.push({ role: 'system', content: sysPrompt });
+    // 多轮对话历史（聊天室）：最近 16 条（支持长对话），每条最多 500 字
     if (ctx && Array.isArray(ctx.history)) {
-      for (const h of ctx.history.slice(-10)) {
+      for (const h of ctx.history.slice(-16)) {
         if (h && (h.role === 'assistant' || h.role === 'user') && h.content) {
-          messages.push({ role: h.role, content: String(h.content).slice(0, 300) });
+          messages.push({ role: h.role, content: String(h.content).slice(0, 500) });
         }
       }
     }
     if (userText) {
+      // 聊天：纯净对话，不注入工作情境（避免回复总往下班/摸鱼上扯）
       messages.push({ role: 'user', content: userText });
     } else {
+      // 自动吐槽：才注入当前情境（星期/时间/剩余工时）让它说应景的话
+      if (ctx && ctx.desc) messages.push({ role: 'user', content: `当前情境：${ctx.desc}` });
       messages.push({ role: 'user', content: `结合当前情境说一句吐槽。` });
+    }
+    // 组装请求体：max_tokens / 思考模式 均可配置
+    const body = {
+      model: cfg.llmModel || undefined,
+      messages,
+      temperature: Math.min(1.5, Math.max(0, Number(cfg.llmTemperature) || 0.9)),
+      max_tokens: Math.max(32, Math.min(4096, Number(cfg.llmMaxTokens) || 200)),
+    };
+    // 思考模式（OpenAI 兼容：reasoning_effort；Kimi 等：thinking）——都带上，不认识的字段会被忽略
+    if (cfg.llmThinking) {
+      body.reasoning_effort = 'high';
+      body.thinking = { type: 'enabled' };
     }
     const res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
@@ -383,20 +390,20 @@ async function petSaying(ctx, userText) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${cfg.llmKey}`,
       },
-      body: JSON.stringify({
-        model: cfg.llmModel || undefined,
-        messages,
-        temperature: Math.min(1.5, Math.max(0, Number(cfg.llmTemperature) || 0.9)),
-        max_tokens: 80,
-      }),
-      signal: AbortSignal.timeout(8000),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
     });
-    if (!res.ok) return fallback;
+    if (!res.ok) {
+      // 把 HTTP 错误原样透出，方便排查网关/Key 问题
+      let detail = '';
+      try { detail = (await res.clone().text()).slice(0, 200); } catch {}
+      return localReply(`HTTP ${res.status} ${detail}`);
+    }
     const json = await res.json();
     const text = json?.choices?.[0]?.message?.content;
-    return (text && String(text).trim()) ? String(text).trim().slice(0, 120) : fallback;
-  } catch {
-    return fallback;
+    return (text && String(text).trim()) ? { text: String(text).trim().slice(0, 2000), source: 'llm' } : localReply('模型返回空内容');
+  } catch (err) {
+    return localReply(String(err && err.message || err).slice(0, 200));
   }
 }
 
@@ -414,11 +421,119 @@ async function listLlmModels(url, key) {
   return arr.map(m => (typeof m === 'string' ? m : m?.id)).filter(Boolean);
 }
 
+/* ---------- 五子棋：大模型走棋 ---------- */
+async function gomokuMove(boardStr, size) {
+  const cfg = await CORE.loadConfig();
+  if (!cfg.llmUrl || !cfg.llmKey) throw new Error('未配置 API');
+  const base = String(cfg.llmUrl).replace(/\/+$/, '');
+  const n = Number(size) || 15;
+  const COLS = 'ABCDEFGHIJKLMNO'.slice(0, n);
+  const system = `你是一台严格的五子棋引擎。棋盘 ${n}×${n}，坐标格式为：列字母（${COLS[0]}~${COLS[n - 1]}）+ 行数字（1~${n}），例如 H8。
+棋盘用 ${n} 段数字表示，段之间用分号分隔，每段 ${n} 个字符：0=空位，1=黑棋（玩家），2=白棋（你）。
+规则：黑白交替落子，先在横、竖或斜方向连成 5 子者获胜。
+你必须只输出一个合法的空位坐标（例如 H8），不要输出任何解释、标点或其他文字。`;
+  const user = `当前棋盘：
+${boardStr}
+
+你是白棋（2）。请只输出你要落子的坐标：`;
+
+  const body = {
+    model: cfg.llmModel || undefined,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature: Math.min(1.5, Math.max(0, Number(cfg.llmTemperature) || 0.7)),
+    max_tokens: 200,
+  };
+  // 思考模式（OpenAI 兼容 + Kimi 格式）
+  if (cfg.llmThinking) {
+    body.reasoning_effort = 'high';
+    body.thinking = { type: 'enabled' };
+  }
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${cfg.llmKey}`,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.clone().text()).slice(0, 120); } catch {}
+    throw new Error('HTTP ' + res.status + ' ' + detail);
+  }
+  const json = await res.json();
+  const text = String((json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) || '').trim();
+  const m = text.toUpperCase().match(/([A-O])\s*(\d{1,2})/);
+  if (!m) throw new Error('模型未返回坐标：' + text.slice(0, 40));
+  return m[1] + m[2];
+}
+
+/* ---------- 中国象棋：大模型走棋 ----------
+ * 前端已算出当前局面的所有合法走法（h2h3 格式，如 h2h3），把列表发给模型，
+ * 要求它只从列表里挑一个原样返回，极大降低模型下出非法棋的概率。 */
+async function xiangqiMove(boardStr, moves, color) {
+  const cfg = await CORE.loadConfig();
+  if (!cfg.llmUrl || !cfg.llmKey) throw new Error('未配置 API');
+  const base = String(cfg.llmUrl).replace(/\/+$/, '');
+  const moveList = (Array.isArray(moves) ? moves : []).map(s => String(s).trim().toLowerCase()).filter(Boolean);
+  const system = `你是一名严谨的中国象棋引擎。你只能从下面给出的「合法走法列表」中挑选一个，并原样输出该走法字符串（例如 h2h3），不要输出任何解释、标点或其他文字。绝对不要输出列表之外的走法。`;
+  const user = `当前局面（红方在下方、黑方在上方；大写字母=红子，小写字母=黑子：K/k=将帅、R/r=车、N/n=马、B/b=相/象、A/a=士、C/c=炮、P/p=兵/卒；. = 空格）：
+${boardStr}
+
+轮到 ${color === 'r' ? '红方（Red）' : '黑方（Black）'} 走子。
+合法走法列表（只能选其中一个，格式为 起点列字母+起点行号+终点列字母+终点行号，如 h2h3）：
+${moveList.join(', ')}
+
+请只输出你要走的那个走法字符串（必须严格等于列表中的某一项）：`;
+  const body = {
+    model: cfg.llmModel || undefined,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature: Math.min(1.5, Math.max(0, Number(cfg.llmTemperature) || 0.5)),
+    max_tokens: 64,
+  };
+  if (cfg.llmThinking) { body.reasoning_effort = 'high'; body.thinking = { type: 'enabled' }; }
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.llmKey}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) {
+    let d = ''; try { d = (await res.clone().text()).slice(0, 120); } catch {}
+    throw new Error('HTTP ' + res.status + ' ' + d);
+  }
+  const json = await res.json();
+  const text = String((json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) || '').trim().toLowerCase();
+  for (const mv of moveList) { if (text.includes(mv)) return mv; }
+  const mm = text.match(/[a-i][1-9][0-9]?[a-i][1-9][0-9]?/);
+  if (mm && moveList.includes(mm[0])) return mm[0];
+  throw new Error('模型未返回合法走法：' + text.slice(0, 40));
+}
+
 /* ---------- 消息分发：摸鱼宠物 ---------- */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === 'gomoku-move') {
+    gomokuMove(msg.board, msg.size)
+      .then(move => sendResponse({ ok: true, move }))
+      .catch(err => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (msg && msg.type === 'xiangqi-move') {
+    xiangqiMove(msg.board, msg.moves, msg.color)
+      .then(move => sendResponse({ ok: true, move }))
+      .catch(err => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
   if (msg && msg.type === 'pet-say') {
     petSaying(msg.context || {}, msg.userText)
-      .then(text => sendResponse({ ok: true, text }));
+      .then(r => sendResponse({ ok: true, text: r.text, source: r.source, error: r.error }));
     return true;
   }
   if (msg && msg.type === 'pet-list-models') {

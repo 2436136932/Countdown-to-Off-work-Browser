@@ -52,12 +52,14 @@ async function doSave() {
       llmKey: $('llmKey').value.trim() || '',
       llmModel: $('llmModel').value || '',
       llmTemperature: Math.min(1.5, Math.max(0, Number($('llmTemperature').value) || 0.9)),
-    petPrompt: ($('petPrompt') && $('petPrompt').value.trim()) || '',
       petPrompt: ($('petPrompt') && $('petPrompt').value.trim()) || '',
+      llmMaxTokens: Math.max(32, Math.min(4096, Number($('llmMaxTokens').value) || 200)),
+      llmThinking: !!($('llmThinking') && $('llmThinking').checked),
       theme: $('theme').value,
       skin: currentSkin,
       texture: currentTexture,
       glassOpacity: $('glassOpacity') ? (isNaN(parseInt($('glassOpacity').value, 10)) ? 65 : parseInt($('glassOpacity').value, 10)) : 65,
+      glassColor: ($('glassColorOn') && $('glassColorOn').checked) ? (($('glassColor') && $('glassColor').value) || '') : '',
       eventSlot: $('eventSlot').value,
       cards: cardsOrder.filter(k => k === 'income' ? true : !cardsHidden.has(k)),
       events: events.map(e => ({ name: e.name, date: e.date, repeatYearly: !!e.repeatYearly })),
@@ -162,7 +164,8 @@ function previewTheme(overrides = {}) {
     theme: $('theme').value,
     skin: currentSkin,
     texture: currentTexture,
-    glassOpacity: curOpacity
+    glassOpacity: curOpacity,
+    glassColor: ($('glassColorOn') && $('glassColorOn').checked && $('glassColor')) ? $('glassColor').value : ''
   }, document.documentElement);
 }
 
@@ -312,6 +315,14 @@ $('llmTemperature')?.addEventListener('input', (e) => {
   autoSave(120);
 });
 
+$('llmMaxTokens')?.addEventListener('input', (e) => {
+  const v = Math.max(32, Math.min(4096, Number(e.target.value) || 200));
+  $('llmMaxTokensVal').textContent = v;
+  autoSave(120);
+});
+
+$('llmThinking')?.addEventListener('change', () => autoSave(0));
+
 $('petPrompt')?.addEventListener('input', () => autoSave(300));
 
 /** 自动获取模型列表 */
@@ -369,7 +380,14 @@ $('llm-test')?.addEventListener('click', async () => {
         else resolve(reply || {});
       });
     });
-    out.textContent = resp.ok ? `「${resp.text}」` : ('调用失败，已用内置吐槽：' + (resp.text || resp.error || ''));
+    if (resp.ok && resp.source === 'llm') {
+      out.textContent = `✓ 大模型回复：「${resp.text}」`;
+    } else if (resp.ok) {
+      const why = resp.error ? `（${resp.error}）` : '（请检查宠物开关 / API 地址 / Key 是否已填写保存）';
+      out.textContent = `⚠ 内置应答${why}：「${resp.text}」`;
+    } else {
+      out.textContent = '调用失败：' + (resp.error || resp.text || '');
+    }
   } catch (err) {
     out.textContent = '调用异常：' + err.message;
   } finally {
@@ -421,6 +439,10 @@ async function init() {
   const llmTemp = Math.min(1.5, Math.max(0, Number(cfg.llmTemperature) || 0.9));
   $('llmTemperature').value = llmTemp;
   $('llmTemperatureVal').textContent = llmTemp.toFixed(1);
+  const llmMaxT = Math.max(32, Math.min(4096, Number(cfg.llmMaxTokens) || 200));
+  $('llmMaxTokens').value = llmMaxT;
+  $('llmMaxTokensVal').textContent = llmMaxT;
+  $('llmThinking').checked = !!cfg.llmThinking;
   if ($('petPrompt')) $('petPrompt').value = cfg.petPrompt || '';
   syncPetUI();
   syncFocusTimeUI();
@@ -434,6 +456,16 @@ async function init() {
   if ($('glassOpacity')) {
     $('glassOpacity').value = opVal;
     updateGlassOpacityUI(opVal);
+  }
+  // 玻璃底色：回填勾选与颜色
+  if ($('glassColorOn')) {
+    const hasColor = !!(cfg.glassColor && /^#[0-9a-fA-F]{6}$/.test(cfg.glassColor));
+    $('glassColorOn').checked = hasColor;
+    if ($('glassColor')) {
+      $('glassColor').value = hasColor ? cfg.glassColor : '#a7c7ff';
+      $('glassColor').disabled = !hasColor;
+      $('glassColor').style.opacity = hasColor ? '1' : '.45';
+    }
   }
 
   cardsOrder = Array.isArray(cfg.cards) ? [...cfg.cards] : ['payday', 'friday', 'holiday', 'income'];
@@ -459,6 +491,26 @@ $('glassOpacity')?.addEventListener('input', (e) => {
   updateGlassOpacityUI(val);
   previewTheme({ glassOpacity: val });
   autoSave(120);
+});
+
+/* 玻璃底色：勾选启用 / 取消即恢复无色 + 实时预览 */
+$('glassColorOn')?.addEventListener('change', (e) => {
+  const on = e.target.checked;
+  const picker = $('glassColor');
+  if (picker) { picker.disabled = !on; picker.style.opacity = on ? '1' : '.45'; }
+  previewTheme();
+  autoSave(0);
+});
+$('glassColor')?.addEventListener('input', () => {
+  previewTheme();
+  autoSave(120);
+});
+$('glassColorReset')?.addEventListener('click', () => {
+  const on = $('glassColorOn'), picker = $('glassColor');
+  if (on) on.checked = false;
+  if (picker) { picker.disabled = true; picker.style.opacity = '.45'; }
+  previewTheme();
+  autoSave(0);
 });
 
 $('theme')?.addEventListener('change', () => {
@@ -491,6 +543,8 @@ $('save').addEventListener('click', async () => {
     llmModel: $('llmModel').value || '',
     llmTemperature: Math.min(1.5, Math.max(0, Number($('llmTemperature').value) || 0.9)),
     petPrompt: ($('petPrompt') && $('petPrompt').value.trim()) || '',
+    llmMaxTokens: Math.max(32, Math.min(4096, Number($('llmMaxTokens').value) || 200)),
+    llmThinking: !!($('llmThinking') && $('llmThinking').checked),
     theme: $('theme').value,
     skin: currentSkin,
     texture: currentTexture,

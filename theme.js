@@ -147,7 +147,10 @@ const THEME = (() => {
     const rawOpacity = (typeof cfg.glassOpacity === 'number') ? cfg.glassOpacity : 65;
     const glassOpacity = Math.max(0, Math.min(100, rawOpacity));
     const alpha = (glassOpacity / 100).toFixed(2);
-    const baseRgb = isDark ? '38, 38, 42' : '255, 255, 255';
+    // 自定义玻璃底色：选中则用用户色，否则跟随主题白/黑（纯透明玻璃）
+    const baseRgb = (cfg.glassColor && /^#[0-9a-fA-F]{6}$/.test(cfg.glassColor))
+      ? cfg.glassColor.slice(1).match(/../g).map(x => parseInt(x, 16)).join(', ')
+      : (isDark ? '38, 38, 42' : '255, 255, 255');
     const cardBg = `rgba(${baseRgb}, ${alpha})`;
     const cardBorder = isDark
       ? `rgba(255, 255, 255, ${Math.max(0.04, (alpha * 0.16)).toFixed(2)})`

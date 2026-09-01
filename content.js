@@ -409,7 +409,10 @@
       const opacity = typeof currentCfg.glassOpacity === 'number' ? currentCfg.glassOpacity / 100 : 0.65;
       const blurPx = Math.round(opacity * 28);
       const filterVal = blurPx > 0 ? `blur(${blurPx}px) saturate(${100 + Math.round(opacity * 90)}%)` : 'none';
-      const bgRgb = themeRes.isDark ? '28, 28, 32' : '255, 255, 255';
+      // 自定义玻璃底色：选中则用用户色，否则跟随主题白/黑（纯透明玻璃）
+      const bgRgb = (currentCfg.glassColor && /^#[0-9a-fA-F]{6}$/.test(currentCfg.glassColor))
+        ? currentCfg.glassColor.slice(1).match(/../g).map(x => parseInt(x, 16)).join(', ')
+        : (themeRes.isDark ? '28, 28, 32' : '255, 255, 255');
       const tileOpacity = (opacity * 0.55).toFixed(2);
       
       islandEl.style.setProperty('--island-bg', opacity > 0 ? `rgba(${bgRgb}, ${opacity})` : 'transparent');

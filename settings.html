@@ -542,6 +542,17 @@
           <span>65% 经典毛玻璃 (推荐)</span>
           <span>100% 实体纯色</span>
         </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:4px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer">
+            <input type="checkbox" id="glassColorOn" style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer">
+            自定义玻璃底色
+          </label>
+          <input type="color" id="glassColor" value="#a7c7ff" disabled
+                 style="width:34px;height:24px;border:none;background:none;padding:0;cursor:pointer;opacity:.45;transition:opacity .15s">
+          <button type="button" id="glassColorReset"
+                  style="font-size:11px;color:var(--text-secondary);background:none;border:1px solid var(--hairline);border-radius:8px;padding:3px 9px;cursor:pointer">恢复无色</button>
+          <span style="font-size:11px;color:var(--text-secondary)">不选 = 跟随主题的纯透明玻璃</span>
+        </div>
       </div>
     </div>
     <div class="row">
@@ -596,16 +607,29 @@
             <input type="range" id="llmTemperature" min="0" max="1.5" step="0.1" value="0.9" style="flex:1;max-width:220px;accent-color:var(--accent);cursor:pointer">
             <span class="unit" id="llmTemperatureVal" style="font-weight:600;min-width:56px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-primary)">0.9</span>
           </div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span class="unit" style="min-width:64px">最大输出</span>
+            <input type="range" id="llmMaxTokens" min="32" max="1024" step="16" value="200" style="flex:1;max-width:220px;accent-color:var(--accent);cursor:pointer">
+            <span class="unit" id="llmMaxTokensVal" style="font-weight:600;min-width:56px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text-primary)">200</span>
+            <span class="unit" style="font-size:11.5px;color:var(--text-secondary)">token / 次（调大可支持长对话）</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label class="switch">
+              <input type="checkbox" id="llmThinking">
+              <span class="slider"></span>
+            </label>
+            <span class="unit">思考模式 <span style="opacity:.65;font-size:11.5px">(先推理再回答，更聪明但更慢)</span></span>
+          </div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <button type="button" class="chip" id="llm-test" style="flex-shrink:0">测试吐槽 🐾</button>
             <span class="unit" id="llm-test-result" style="font-size:13px"></span>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <span class="unit" style="min-width:64px">人设提示词 <span style="opacity:.6">(可自定义性格，留空用默认摸鱼兽)</span></span>
+            <span class="unit" style="min-width:64px">人设提示词 <span style="opacity:.6">(完全由你定义；留空 = 不加任何系统提示词)</span></span>
             <textarea id="petPrompt" rows="6" maxlength="500"
-              placeholder="例：你是一只傲娇的橘猫，毒舌但心软，口头禅是「喵了个咪的」，说话不超过20字，偶尔用日语吐槽…&#10;&#10;留空 → 用默认摸鱼兽人设&#10;填写后 → 300ms 自动保存，按 Enter 可换行"
+              placeholder="例：你是一只傲娇的橘猫，毒舌但心软，口头禅是「喵了个咪的」，说话不超过20字，偶尔用日语吐槽…&#10;&#10;留空 → 不加任何系统提示词，模型按自身默认行为回答&#10;填写后 → 完全按你的设定回答，300ms 自动保存"
               style="width:100%;border:0.5px solid var(--hairline);border-radius:16px;padding:14px 16px;font-size:14px;font-family:inherit;line-height:1.7;outline:none;background:var(--card-bg,rgba(255,255,255,0.5));backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--text-primary);resize:none;box-sizing:border-box;transition:border-color .2s ease,box-shadow .2s ease,background-color .2s ease;-webkit-appearance:none;font-feature-settings:'tnum';letter-spacing:-0.01em;"></textarea>
-            <span class="unit" style="font-size:12px">自定义人设会覆盖默认摸鱼兽人设，让宠物按你的设定回答问题；改动自动保存。</span>
+            <span class="unit" style="font-size:12px;color:#ff9500;font-weight:500">⚠️ 人设提示词作为 system 消息直接发送给模型（不叠加任何内置人设），仅在你填写了上方 API 地址 + Key 并开启宠物开关时生效；未配置 API 时走内置应答。</span>
           </div>
           <span class="unit" style="font-size:12px">未配置 API 时自动使用内置吐槽池；Key 仅保存在本地浏览器，绝不上传。</span>
         </div>

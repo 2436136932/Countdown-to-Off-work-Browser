@@ -32,11 +32,14 @@ const CORE = (() => {
     llmKey: '',                  // API Key
     llmModel: '',                // 模型名（留空则自动获取第一个可用模型）
     llmTemperature: 0.9,         // 吐槽创造性温度 (0~1.5)
-    petPrompt: '',               // 自定义人设提示词（覆盖默认摸鱼兽人设，留空用默认）
+    petPrompt: '',               // 人设提示词（作为 system 消息发送；留空 = 不加任何系统提示，裸调模型）
+    llmMaxTokens: 200,           // 单次回复最大输出 token（支持长对话）
+    llmThinking: false,          // 思考模式：开启后模型先推理再回答（更聪明但更慢）
     theme: 'light',              // light | dark | auto（跟随系统）
     skin: 'pro',                 // pro | alpine | sierra | midnight | amber | lilac | sakura | paper
     texture: 'none',             // none | dots | noise
     glassOpacity: 65,            // 卡片毛玻璃不透明度 (10~100，默认 65，透出精美背景)
+    glassColor: '',              // 自定义玻璃底色（hex，如 #a7c7ff）；留空 = 跟随主题白/黑，纯透明玻璃
     cards: ['payday', 'friday', 'holiday', 'income'],  // 显示顺序（income 受 showIncome 二次控制）
     events: [],                  // 自定义倒数日 [{name, date:'YYYY-MM-DD', repeatYearly?}]
     eventSlot: 'holiday',        // 第几张卡被倒数日替换（找不到该卡则追加在末尾）：'none'|卡片key

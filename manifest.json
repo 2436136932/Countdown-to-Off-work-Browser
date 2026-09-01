@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Offwork Countdown — 下班倒计时",
   "short_name": "下班倒计时",
-  "version": "1.4.1",
+  "version": "1.5.2",
   "description": "Apple 风格的下班倒计时。8 款 Apple 原生高质感皮肤与微纹理，角标显示剩余时间，下班提醒，法定节假日与调休日历（联网自动更新），月薪折算与自定义倒数日。",
   "minimum_chrome_version": "110",
   "icons": {
@@ -35,7 +35,7 @@
     },
     {
       "matches": ["<all_urls>"],
-      "js": ["content_pet.js"],
+      "js": ["xiangqi.js", "content_pet.js"],
       "run_at": "document_idle"
     }
   ],
