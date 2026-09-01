@@ -32,6 +32,8 @@
   let cfg = null;
   let history = [];
   let busy = false;
+  // 五子棋/象棋棋盘与棋子的透明度（0.35~1，跟随玻璃透明度联动：面板越透明棋子越淡，保底能看清）
+  let gameAlpha = 1;
 
   // 注入的 DOM 引用
   let host = null;
@@ -85,12 +87,13 @@
       .floating-window * { box-sizing: border-box; }
 
       .topbar {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 14px 16px 10px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: flex-end;
+        padding: 8px 10px 6px; flex-shrink: 0;
         cursor: grab;
       }
       .topbar:active { cursor: grabbing; }
-      .topbar-left { display: flex; align-items: center; gap: 9px; }
+      /* 摸鱼：装饰性标题（摸鱼兽聊天室 + 在线点）隐藏，太显眼 */
+      .topbar-left { display: none; }
       .topbar-title {
         font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em;
         display: flex; align-items: center; gap: 7px;
@@ -111,10 +114,18 @@
       }
       .topbar-btn:hover { background: rgba(120, 120, 128, 0.24); }
       .topbar-btn:active { transform: scale(0.96); }
-      .topbar-btn.primary { background: var(--island-accent, #0071e3); color: #fff; }
-      .topbar-btn.primary:hover { filter: brightness(1.1); }
-      /* 当前视图高亮 */
-      .topbar-btn.on { background: var(--island-accent, #0071e3); color: #fff; }
+      .topbar-btn.primary {
+        background: var(--island-accent-soft, rgba(70,120,220,0.18));
+        border-color: var(--island-accent-line, rgba(70,120,220,0.35));
+        color: var(--island-text, #1d1d1f); font-weight: 600;
+      }
+      .topbar-btn.primary:hover { background: var(--island-accent-line, rgba(70,120,220,0.35)); }
+      /* 当前视图高亮：淡蓝底（跟随玻璃）而非实心亮蓝 */
+      .topbar-btn.on {
+        background: var(--island-accent-soft, rgba(70,120,220,0.18));
+        border-color: var(--island-accent-line, rgba(70,120,220,0.35));
+        color: var(--island-text, #1d1d1f); font-weight: 600;
+      }
       .topbar-btn.on:hover { filter: brightness(1.1); }
 
       .pet-stage {
@@ -135,7 +146,8 @@
         50% { transform: translateY(-4px); }
       }
       #pet-avatar { line-height: 0; }
-      .pet-name { margin-top: 8px; font-size: 13px; font-weight: 700; }
+      /* 摸鱼："摸鱼兽"品牌名隐藏，太显眼（台词气泡保留，那是聊天内容） */
+      .pet-name { display: none; }
       .pet-motto {
         margin-top: 3px; font-size: 11.5px;
         color: var(--island-sub, #86868b);
@@ -275,8 +287,11 @@
         transition: all .15s ease;
       }
       .chip-mini:hover { border-color: var(--island-accent, #0071e3); color: var(--island-accent, #0071e3); }
+      /* 选中态：淡蓝半透明底（跟随玻璃透明度）+ 文字色，避免实心亮蓝太扎眼 */
       .chip-mini.on {
-        background: var(--island-accent, #0071e3); border-color: transparent; color: #fff; font-weight: 600;
+        background: var(--island-accent-soft, rgba(70,120,220,0.18));
+        border-color: var(--island-accent-line, rgba(70,120,220,0.35));
+        color: var(--island-text, #1d1d1f); font-weight: 600;
       }
       .chip-mini:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -418,9 +433,17 @@
   function applyGlass() {
     if (!host || !cfg) return;
     let isDark = false;
+    // 个性皮肤主色（如风暴蓝 #8BB5DE / 玫瑰粉 #D4A5A5 / 抹茶绿 #B0D8A8），用于选中态；取不到则兜底中性蓝
+    let accentRgb = '70, 120, 220';
     try {
       if (typeof THEME !== 'undefined' && THEME.resolveTheme) {
-        isDark = !!THEME.resolveTheme(cfg).isDark;
+        const tr = THEME.resolveTheme(cfg);
+        isDark = !!(tr && tr.isDark);
+        const a = (tr && tr.accent) ? String(tr.accent) : '';
+        const hex = a.replace('#', '');
+        if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+          accentRgb = hex.match(/../g).map(x => parseInt(x, 16)).join(', ');
+        }
       }
     } catch {}
 
@@ -430,31 +453,51 @@
     const filterVal = blurPx > 0
       ? `blur(${blurPx}px) saturate(${100 + Math.round(opacity * 90)}%)`
       : 'none';
+    // 五子棋/象棋棋子透明度跟玻璃联动：面板越透明→棋子越淡；摸鱼保底 0.15（几乎隐形）
+    gameAlpha = Math.round((0.15 + 0.85 * opacity) * 100) / 100;
+    // 文字透明度跟玻璃联动：主文字（标题/状态/按钮）保底 0.22，次要(hint) 0.10；强调色不淡（功能色）
+    const textAlpha = Math.round((0.22 + 0.78 * opacity) * 100) / 100;
+    const subAlpha = Math.round((0.10 + 0.55 * opacity) * 100) / 100;
+    const textBase = isDark ? '255, 255, 255' : '24, 24, 28';
+    host.style.setProperty('--island-text', `rgba(${textBase}, ${textAlpha})`);
+    host.style.setProperty('--island-sub', `rgba(${textBase}, ${subAlpha})`);
     // 自定义玻璃底色：选中则用用户色，否则跟随主题白/黑（纯透明玻璃）
     const bgRgb = (cfg.glassColor && /^#[0-9a-fA-F]{6}$/.test(cfg.glassColor))
       ? cfg.glassColor.slice(1).match(/../g).map(x => parseInt(x, 16)).join(', ')
       : (isDark ? '28, 28, 32' : '255, 255, 255');
+
+    // 选中态（执红先/本地/中等 chip、视图切换按钮）：用当前个性皮肤的主色，跟随玻璃透明度
+    const accentSoft = Math.max(0.06, 0.26 * opacity).toFixed(3);
+    const accentLine = Math.max(0.10, 0.50 * opacity).toFixed(3);
+    host.style.setProperty('--island-accent-soft', `rgba(${accentRgb}, ${accentSoft})`);
+    host.style.setProperty('--island-accent-line', `rgba(${accentRgb}, ${accentLine})`);
 
     // 主体：完全跟随滑块（0% 时彻底透明、关闭模糊 → 真·空气悬浮）
     host.style.setProperty('--island-bg', opacity > 0 ? `rgba(${bgRgb}, ${opacity})` : 'transparent');
     host.style.setProperty('--island-filter', filterVal);
     host.style.setProperty('--island-border', opacity > 0
       ? (isDark
-          ? `rgba(255,255,255,${Math.max(0.04, opacity * 0.16)})`
-          : `rgba(255,255,255,${Math.max(0.18, opacity * 0.75)})`)
-      : (isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'));
+          ? `rgba(255,255,255,${Math.max(0.02, opacity * 0.16)})`
+          : `rgba(255,255,255,${Math.max(0.08, opacity * 0.75)})`)
+      : (isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)'));
     host.style.setProperty('--island-shadow', opacity > 0
-      ? `0 24px 60px -12px rgba(0,0,0,${Math.min(0.28, opacity * 0.32)}), 0 2px 8px rgba(0,0,0,0.05), inset 0 1px 1px 0 rgba(255,255,255,${opacity * 0.85})`
-      : '0 12px 32px -8px rgba(0, 0, 0, 0.14)');
+      ? `0 24px 60px -12px rgba(0,0,0,${Math.min(0.28, opacity * 0.32)}), 0 2px 8px rgba(0,0,0,${0.02 * opacity}), inset 0 1px 1px 0 rgba(255,255,255,${opacity * 0.85})`
+      : '0 6px 16px -8px rgba(0, 0, 0, 0.04)');
 
-    // 气泡/输入框：跟随滑块但保留最低 32% 底，保证聊天文字始终可读
-    const tileOpacity = Math.max(0.32, opacity * 0.6).toFixed(2);
+    // 气泡/输入框：摸鱼模式降低保底，整体跟玻璃一起淡（保底 0.10 仍保留可读余地）
+    const tileOpacity = Math.max(0.10, opacity * 0.6).toFixed(2);
     host.style.setProperty('--tile-bg', `rgba(${bgRgb}, ${tileOpacity})`);
     host.style.setProperty('--tile-border', opacity > 0
       ? (isDark
-          ? `rgba(255,255,255,${Math.max(0.06, opacity * 0.16)})`
-          : `rgba(255,255,255,${Math.max(0.25, opacity * 0.6)})`)
-      : (isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.45)'));
+          ? `rgba(255,255,255,${Math.max(0.02, opacity * 0.16)})`
+          : `rgba(255,255,255,${Math.max(0.10, opacity * 0.6)})`)
+      : (isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.20)'));
+    // 透明度变化 → 让当前显示的游戏棋盘/棋子立即套用新透明度
+    try {
+      const gv = $('gomoku-view'), xv = $('xiangqi-view');
+      if (gv && gv.style.display === 'flex' && gmBoard) gmDraw();
+      if (xv && xv.style.display === 'flex' && xqBoard) { xqSizeCanvas(); xqRender(); }
+    } catch {}
   }
 
   /* ---------- 表情 ---------- */
@@ -702,6 +745,8 @@
     const ctx = canvas.getContext('2d');
     const size = canvas.width;
     ctx.clearRect(0, 0, size, size);
+    // 整体透明度跟随玻璃（棋盘+棋子一起淡，保底看清能下）
+    ctx.globalAlpha = gameAlpha;
 
     // 半透明底，透出毛玻璃
     ctx.fillStyle = 'rgba(255,255,255,0.10)';
@@ -749,6 +794,7 @@
       ctx.lineWidth = 1.3;
       ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.stroke();
     }
+    ctx.globalAlpha = 1; // 恢复，避免影响后续绘制
   }
 
   /* ---------- 工具 ---------- */
@@ -1132,6 +1178,8 @@
     const W = cv.width, H = cv.height;
     const C = xqCell, P = xqPad;
     ctx.clearRect(0, 0, W, H);
+    // 整体透明度跟随玻璃（棋盘+棋子一起淡，保底看清能下）
+    ctx.globalAlpha = gameAlpha;
     ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, 0, W, H);
 
     ctx.strokeStyle = 'rgba(0,0,0,0.38)'; ctx.lineWidth = 1;
@@ -1164,15 +1212,15 @@
     ctx.fillText('楚 河', P + 2 * C, P + 4.5 * C);
     ctx.fillText('漢 界', P + 6 * C, P + 4.5 * C);
 
-    // 选中标记 + 合法落点
+    // 选中标记 + 合法落点（柔化为低调灰蓝，像网页 hover 提示而不是游戏高亮）
     if (xqSelected) {
-      ctx.strokeStyle = 'rgba(255,59,48,0.95)'; ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(70,120,220,0.55)'; ctx.lineWidth = 1.2;
       ctx.strokeRect(P + xqSelected.c * C - C * 0.5 + 1, P + xqSelected.r * C - C * 0.5 + 1, C - 2, C - 2);
     }
     if (xqSelected && xqDests.length) {
-      ctx.fillStyle = 'rgba(255,59,48,0.35)';
+      ctx.strokeStyle = 'rgba(70,120,220,0.45)'; ctx.lineWidth = 1.2;
       for (const d of xqDests) {
-        ctx.beginPath(); ctx.arc(P + d.c * C, P + d.r * C, C * 0.14, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(P + d.c * C, P + d.r * C, C * 0.14, 0, Math.PI * 2); ctx.stroke();
       }
     }
     // 棋子
@@ -1184,21 +1232,22 @@
         if (p.c === 'r') { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#ffe2e2'); }
         else { g.addColorStop(0, '#f3f3f5'); g.addColorStop(1, '#cdcdd5'); }
         ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = p.c === 'r' ? 'rgba(200,40,40,0.85)' : 'rgba(40,40,60,0.9)';
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = p.c === 'r' ? 'rgba(170,60,50,0.55)' : 'rgba(40,40,60,0.55)';
         ctx.stroke();
-        ctx.fillStyle = p.c === 'r' ? '#c0392b' : '#1d1d1f';
+        ctx.fillStyle = p.c === 'r' ? '#a04545' : '#1d1d1f';
         ctx.font = '700 ' + Math.round(C * 0.5) + 'px "PingFang SC","Microsoft YaHei",serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(XQ.CN[p.c][p.t], x, y + 1);
       }
     }
-    // 最后一手标记
+    // 最后一手标记（柔化蓝圈）
     if (xqLast) {
       const x = P + xqLast.c * C, y = P + xqLast.r * C;
-      ctx.strokeStyle = 'rgba(0,113,227,0.9)'; ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(70,120,220,0.45)'; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.arc(x, y, C * 0.46, 0, Math.PI * 2); ctx.stroke();
     }
+    ctx.globalAlpha = 1; // 恢复，避免影响后续绘制
   }
 
   /* ---------- 坐标换算 / 点击落子 ---------- */
