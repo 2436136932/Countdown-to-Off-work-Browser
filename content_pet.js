@@ -263,7 +263,8 @@
         width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
       }
       .gomoku-status { font-size: 12.5px; font-weight: 600; color: var(--island-text, #1d1d1f); white-space: nowrap; }
-      .gomoku-status.win { color: var(--island-accent, #0071e3); }
+      /* 赢棋文字：跟普通状态条同色，不再主色高亮——低调免被老板看出在玩 */
+      .gomoku-status.win { color: var(--island-text, #1d1d1f); }
       .gomoku-actions { display: flex; gap: 6px; flex-shrink: 0; }
       .gomoku-canvas-wrap {
         position: relative;
@@ -305,7 +306,8 @@
         width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
       }
       .xiangqi-status { font-size: 12.5px; font-weight: 600; color: var(--island-text, #1d1d1f); white-space: nowrap; }
-      .xiangqi-status.win { color: var(--island-accent, #0071e3); }
+      /* 同上：赢棋不主色高亮 */
+      .xiangqi-status.win { color: var(--island-text, #1d1d1f); }
       .xiangqi-actions { display: flex; gap: 6px; flex-shrink: 0; }
       .xiangqi-canvas-wrap {
         position: relative; border-radius: 14px; line-height: 0;
