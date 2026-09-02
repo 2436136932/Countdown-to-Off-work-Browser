@@ -137,7 +137,7 @@
         border-radius: 50%;
         background: var(--tile-bg, rgba(255, 255, 255, 0.5));
         border: 0.5px solid var(--tile-border, rgba(255, 255, 255, 0.7));
-        box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.05), inset 0 1px 1px 0 rgba(255, 255, 255, 0.3);
+        box-shadow: 0 10px 26px -6px rgba(0, 0, 0, 0.14), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
         display: flex; align-items: center; justify-content: center;
         animation: floaty 3.2s ease-in-out infinite;
       }
@@ -176,16 +176,16 @@
         flex-shrink: 0; line-height: 0;
       }
       .msg.user .msg-avatar {
-        background: var(--island-accent-soft, rgba(70,120,220,0.18));
-        border: 0.5px solid var(--island-accent-line, rgba(70,120,220,0.35));
-        color: var(--island-text, #1d1d1f);
+        background: var(--island-accent, rgba(0, 113, 227, 0.12));
+        border-color: transparent;
+        color: var(--island-accent, #0071e3);
         font-size: 12px; font-weight: 600;
       }
 
       .bubble {
         padding: 8px 13px; font-size: 13px; line-height: 1.5;
         border-radius: 16px; word-break: break-word;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
       }
       .msg.pet .bubble {
         background: var(--tile-bg, rgba(255, 255, 255, 0.72));
@@ -201,9 +201,8 @@
         align-self: flex-start;
       }
       .msg.user .bubble {
-        background: var(--island-accent-soft, rgba(70,120,220,0.18));
-        color: var(--island-text, #1d1d1f);
-        border: 0.5px solid var(--island-accent-line, rgba(70,120,220,0.35));
+        background: var(--island-accent, #0071e3);
+        color: #fff;
         border-bottom-right-radius: 5px;
       }
       .bubble.typing {
@@ -243,14 +242,14 @@
       }
       #chat-input::placeholder { color: var(--island-sub, #86868b); }
       #send-btn {
-        border: 0.5px solid var(--island-accent-line, rgba(70,120,220,0.35));
-        background: var(--island-accent-soft, rgba(70,120,220,0.18));
-        color: var(--island-text, #1d1d1f); border-radius: 20px;
+        border: none;
+        background: var(--island-accent, #0071e3);
+        color: #fff; border-radius: 20px;
         padding: 0 18px; font-size: 13px; font-weight: 700;
         cursor: pointer; font-family: inherit; flex-shrink: 0;
-        transition: transform .1s ease, background .15s ease;
+        transition: transform .1s ease, filter .15s ease;
       }
-      #send-btn:hover { background: var(--island-accent-line, rgba(70,120,220,0.35)); }
+      #send-btn:hover { filter: brightness(1.1); }
       #send-btn:active { transform: scale(0.95); }
       #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
