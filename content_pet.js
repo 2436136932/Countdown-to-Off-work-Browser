@@ -341,6 +341,202 @@
       }
       .mahjong-host > * { flex: 1; min-height: 0; }
 
+      /* 三游戏视图容器（扫雷/2048/连连看，小窗可玩） */
+      .game-view { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 4px 8px 8px; min-height: 0; overflow: hidden; }
+      .game-host { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+      .game-host > * { width: 100%; height: 100%; }
+
+      /* ===== 扫雷 / 2048 / 连连看（移植自 glass-games，变量由 applyGlass 映射） ===== */
+      /* ============================================================
+       * 新增游戏（连连看 / 2048 / 扫雷）
+       * 全部走 calc() 联动 --glass-alpha（玻璃透明度）与 --stone-ink（墨色），
+       * 所以拖动滑块时 DOM 自动变淡，不需要 JS 重绘。
+       * ============================================================ */
+      
+      /* ---------- 连连看 ---------- */
+      .ll-wrap {
+        position: relative;
+        width: 100%; height: 100%;
+        display: flex; align-items: center; justify-content: center;
+        padding: 6px;
+        box-sizing: border-box;
+      }
+      
+      .ll-grid {
+        display: grid;
+        grid-template-columns: repeat(var(--c), 1fr);
+        gap: 4px;
+        width: 100%;
+        max-height: 100%;
+      }
+      
+      .ll-tile {
+        aspect-ratio: 1;
+        min-width: 0; min-height: 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 9px;
+        border: 1px solid rgba(120, 126, 138, calc(0.10 + 0.26 * var(--glass-alpha)));
+        background: rgba(168, 172, 180, calc(0.04 + 0.13 * var(--glass-alpha)));
+        cursor: pointer;
+        user-select: none;
+        transition: opacity 0.22s ease, transform 0.12s ease, background 0.2s ease;
+      }
+      
+      .ll-tile .e {
+        font-size: clamp(13px, 3.6vh, 26px);
+        line-height: 1;
+        opacity: calc(0.30 + 0.70 * var(--stone-ink));
+      }
+      
+      .ll-tile:hover {
+        background: rgba(168, 172, 180, calc(0.10 + 0.20 * var(--glass-alpha)));
+      }
+      
+      .ll-tile.sel {
+        /* 选中态：低饱和灰蓝，不用亮蓝（亮蓝在透明玻璃上太跳） */
+        background: rgba(126, 144, 170, calc(0.12 + 0.30 * var(--glass-alpha)));
+        border-color: rgba(126, 144, 170, calc(0.35 + 0.40 * var(--glass-alpha)));
+        transform: scale(1.06);
+      }
+      
+      .ll-tile.hit {
+        background: rgba(198, 130, 122, calc(0.18 + 0.32 * var(--glass-alpha)));
+        transform: scale(1.12);
+      }
+      
+      .ll-tile.gone { opacity: 0; pointer-events: none; transform: scale(0.5); }
+      
+      .ll-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      
+      .ll-path {
+        fill: none;
+        stroke: rgba(126, 144, 170, calc(0.35 + 0.45 * var(--glass-alpha)));
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        animation: llFade 0.3s ease forwards;
+      }
+      
+      @keyframes llFade { 0% { opacity: 1; } 100% { opacity: 0; } }
+      
+      /* ---------- 2048 ---------- */
+      .g48-grid {
+        display: grid;
+        grid-template-columns: repeat(var(--n), 1fr);
+        gap: 5px;
+        width: min(100%, 46vh);
+        padding: 6px;
+        box-sizing: border-box;
+      }
+      
+      .g48-cell {
+        aspect-ratio: 1;
+        min-width: 0;
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: clamp(12px, 3.2vh, 24px);
+        font-weight: 600;
+        font-family: var(--font);
+        /* 空格：极淡的底 */
+        background: rgba(168, 172, 180, calc(0.03 + 0.09 * var(--glass-alpha)));
+        color: rgba(29, 29, 31, calc(0.45 + 0.40 * var(--stone-ink)));
+        transition: background 0.15s ease, transform 0.1s ease;
+      }
+      
+      .g48-cell.pop { animation: g48pop 0.16s ease; }
+      
+      @keyframes g48pop { from { transform: scale(0.4); } to { transform: scale(1); } }
+      
+      /* 数值越大越深（灰度梯度，低饱和：颜色浓度由 --stone-ink 控制） */
+      .g48-cell[class*=" v"] {
+        background: rgba(168, 172, 180, calc((0.08 + 0.16 * var(--glass-alpha))));
+      }
+      
+      .g48-cell.v2    { background: rgba(232, 234, 240, calc(0.18 + 0.30 * var(--glass-alpha))); }
+      
+      .g48-cell.v4    { background: rgba(216, 220, 230, calc(0.20 + 0.32 * var(--glass-alpha))); }
+      
+      .g48-cell.v8    { background: rgba(196, 202, 216, calc(0.22 + 0.34 * var(--glass-alpha))); }
+      
+      .g48-cell.v16   { background: rgba(178, 186, 204, calc(0.24 + 0.36 * var(--glass-alpha))); }
+      
+      .g48-cell.v32   { background: rgba(162, 172, 194, calc(0.26 + 0.38 * var(--glass-alpha))); }
+      
+      .g48-cell.v64   { background: rgba(148, 160, 186, calc(0.28 + 0.40 * var(--glass-alpha))); }
+      
+      .g48-cell.v128  { background: rgba(136, 150, 180, calc(0.30 + 0.42 * var(--glass-alpha))); color: rgba(255,255,255, calc(0.55 + 0.35 * var(--stone-ink))); }
+      
+      .g48-cell.v256  { background: rgba(126, 142, 176, calc(0.32 + 0.44 * var(--glass-alpha))); color: rgba(255,255,255, calc(0.60 + 0.32 * var(--stone-ink))); }
+      
+      .g48-cell.v512  { background: rgba(116, 134, 172, calc(0.34 + 0.46 * var(--glass-alpha))); color: rgba(255,255,255, calc(0.65 + 0.28 * var(--stone-ink))); }
+      
+      .g48-cell.v1024 { background: rgba(108, 126, 168, calc(0.36 + 0.48 * var(--glass-alpha))); color: rgba(255,255,255, calc(0.70 + 0.24 * var(--stone-ink))); }
+      
+      .g48-cell.v2048 { background: rgba(150, 120, 110, calc(0.38 + 0.50 * var(--glass-alpha))); color: rgba(255,255,255, calc(0.75 + 0.20 * var(--stone-ink))); }
+      
+      .g48-cell.v4096 { background: rgba(140, 106, 96, calc(0.40 + 0.50 * var(--glass-alpha))); color: rgba(255,255,255, calc(0.78 + 0.18 * var(--stone-ink))); }
+      
+      .g48-grid.over { opacity: 0.65; }
+      
+      /* ---------- 扫雷 ---------- */
+      .mn-grid {
+        display: grid;
+        grid-template-columns: repeat(var(--c), 1fr);
+        gap: 2px;
+        width: 100%;
+        max-height: 100%;
+        padding: 6px;
+        box-sizing: border-box;
+      }
+      
+      .mn-cell {
+        aspect-ratio: 1;
+        min-width: 0;
+        border-radius: 4px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: clamp(9px, 2.4vh, 18px);
+        font-weight: 600;
+        font-family: var(--font);
+        user-select: none;
+        cursor: pointer;
+        background: rgba(168, 172, 180, calc(0.05 + 0.16 * var(--glass-alpha)));
+        border: 1px solid rgba(120, 126, 138, calc(0.08 + 0.18 * var(--glass-alpha)));
+        transition: background 0.15s ease;
+      }
+      
+      .mn-cell:hover { background: rgba(168, 172, 180, calc(0.12 + 0.24 * var(--glass-alpha))); }
+      
+      .mn-cell.dug {
+        background: transparent;
+        border-color: rgba(120, 126, 138, calc(0.04 + 0.08 * var(--glass-alpha)));
+        cursor: default;
+      }
+      
+      /* 数字配色：低饱和（亮蓝/鲜红在透明玻璃上太跳，全部降饱和） */
+      .mn-cell.n1 { color: rgba(126, 144, 170, calc(0.45 + 0.45 * var(--stone-ink))); }
+      
+      .mn-cell.n2 { color: rgba(116, 156, 138, calc(0.45 + 0.45 * var(--stone-ink))); }
+      
+      .mn-cell.n3 { color: rgba(198, 130, 122, calc(0.45 + 0.45 * var(--stone-ink))); }
+      
+      .mn-cell.n4 { color: rgba(138, 128, 176, calc(0.45 + 0.45 * var(--stone-ink))); }
+      
+      .mn-cell.n5 { color: rgba(170, 138, 108, calc(0.45 + 0.45 * var(--stone-ink))); }
+      
+      .mn-cell.n6 { color: rgba(108, 156, 158, calc(0.45 + 0.45 * var(--stone-ink))); }
+      
+      .mn-cell.n7 { color: rgba(120, 124, 134, calc(0.50 + 0.40 * var(--stone-ink))); }
+      
+      .mn-cell.n8 { color: rgba(96, 100, 112, calc(0.50 + 0.40 * var(--stone-ink))); }
+      
+      .mn-cell.flag { color: rgba(198, 130, 122, calc(0.40 + 0.45 * var(--stone-ink))); }
+      
+      .mn-cell.mine { color: rgba(140, 118, 118, calc(0.30 + 0.35 * var(--stone-ink))); }
+      
+      .mn-cell.boom {
+        background: rgba(198, 130, 122, calc(0.16 + 0.30 * var(--glass-alpha)));
+        color: rgba(198, 130, 122, calc(0.55 + 0.35 * var(--stone-ink)));
+      }
       /* ===== 红中麻将（移植自 glass-games，变量由 applyGlass 映射） ===== */
       /* ---------- 红中麻将（112 张 · 赖子百搭 · 无吃只碰杠） ---------- */
       .mj-root {
@@ -840,6 +1036,9 @@
           <button class="topbar-btn" id="view-gomoku-btn" title="和摸鱼兽下五子棋">♟</button>
           <button class="topbar-btn" id="view-xiangqi-btn" title="和摸鱼兽下象棋">♞</button>
           <button class="topbar-btn" id="view-mahjong-btn" title="红中麻将（赖子·碰杠·自摸胡）">🀄</button>
+          <button class="topbar-btn" id="view-minesweeper-btn" title="扫雷">⊞</button>
+          <button class="topbar-btn" id="view-g2048-btn" title="2048">Ⓑ</button>
+          <button class="topbar-btn" id="view-lianliankan-btn" title="连连看">🀫</button>
           <button class="topbar-btn" id="reset-btn" title="清空聊天记录">新话题</button>
           <button class="topbar-btn primary" id="close-btn" title="关闭">✕</button>
         </div>
@@ -941,6 +1140,61 @@
         </div>
         <div class="mahjong-host" id="mahjong-host"></div>
         <div class="xiangqi-hint" id="mahjong-hint">点手牌打出 · 可碰/杠/自摸胡（红中是赖子，别打出去）</div>
+      </div>
+      <div class="game-view" id="minesweeper-view" style="display:none">
+        <div class="xiangqi-bar">
+          <span class="xiangqi-status" id="minesweeper-status">扫雷 · 左键挖开 / 右键插旗</span>
+          <div class="xiangqi-actions">
+            <button class="topbar-btn" id="minesweeper-restart" title="新局">新局</button>
+          </div>
+        </div>
+        <div class="xiangqi-bar">
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;opacity:.7">难度</span>
+            <button class="chip-mini on" data-mndiff="easy" id="mn-diff-easy">简单</button>
+            <button class="chip-mini" data-mndiff="medium" id="mn-diff-medium">中等</button>
+            <button class="chip-mini" data-mndiff="hard" id="mn-diff-hard">困难</button>
+          </div>
+        </div>
+        <div class="game-host" id="minesweeper-host"></div>
+        <div class="xiangqi-hint" id="minesweeper-hint">左键翻开 · 右键插旗 · 数字=周围雷数</div>
+      </div>
+      <div class="game-view" id="g2048-view" style="display:none">
+        <div class="xiangqi-bar">
+          <span class="xiangqi-status" id="g2048-status">2048 · 滑动合成</span>
+          <div class="xiangqi-actions">
+            <button class="topbar-btn" id="g2048-undo" title="悔棋">悔棋</button>
+            <button class="topbar-btn" id="g2048-restart" title="新局">新局</button>
+          </div>
+        </div>
+        <div class="xiangqi-bar">
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;opacity:.7">难度</span>
+            <button class="chip-mini" data-g48diff="easy" id="g48-diff-easy">简单·5×5</button>
+            <button class="chip-mini on" data-g48diff="medium" id="g48-diff-medium">中等·4×4</button>
+            <button class="chip-mini" data-g48diff="hard" id="g48-diff-hard">困难·3×3</button>
+          </div>
+        </div>
+        <div class="game-host" id="g2048-host"></div>
+        <div class="xiangqi-hint" id="g2048-hint">鼠标滑动 / 方向键 / WASD 移动格子</div>
+      </div>
+      <div class="game-view" id="lianliankan-view" style="display:none">
+        <div class="xiangqi-bar">
+          <span class="xiangqi-status" id="lianliankan-status">连连看 · 点两个相同图案消除</span>
+          <div class="xiangqi-actions">
+            <button class="topbar-btn" id="lianliankan-restart" title="新局">新局</button>
+          </div>
+        </div>
+        <div class="xiangqi-bar">
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;opacity:.7">难度</span>
+            <button class="chip-mini on" data-lldiff="easy" id="ll-diff-easy">简单·5×6</button>
+            <button class="chip-mini" data-lldiff="medium" id="ll-diff-medium">中等·6×8</button>
+            <button class="chip-mini" data-lldiff="hard" id="ll-diff-hard">困难·7×10</button>
+          </div>
+        </div>
+        <div class="game-host" id="lianliankan-host"></div>
+        <div class="xiangqi-hint" id="lianliankan-hint">连线转弯不超过 2 次即可消除</div>
       </div>
     `;
     shadow.appendChild(panel);
@@ -1228,6 +1482,23 @@
     });
     ['mj-diff-easy', 'mj-diff-medium', 'mj-diff-hard'].forEach(id => {
       $(id).addEventListener('click', () => mjSetDiff($(id).dataset.mjdiff));
+    });
+    // 三个单人游戏（扫雷 / 2048 / 连连看）
+    $('view-minesweeper-btn').addEventListener('click', () => switchView('minesweeper'));
+    $('view-g2048-btn').addEventListener('click', () => switchView('g2048'));
+    $('view-lianliankan-btn').addEventListener('click', () => switchView('lianliankan'));
+    $('minesweeper-restart').addEventListener('click', () => simpleNewGame('minesweeper'));
+    ['mn-diff-easy', 'mn-diff-medium', 'mn-diff-hard'].forEach(id => {
+      $(id).addEventListener('click', () => simpleSetDiff('minesweeper', $(id).dataset.mndiff));
+    });
+    $('g2048-undo').addEventListener('click', () => simpleUndo('g2048'));
+    $('g2048-restart').addEventListener('click', () => simpleNewGame('g2048'));
+    ['g48-diff-easy', 'g48-diff-medium', 'g48-diff-hard'].forEach(id => {
+      $(id).addEventListener('click', () => simpleSetDiff('g2048', $(id).dataset.g48diff));
+    });
+    $('lianliankan-restart').addEventListener('click', () => simpleNewGame('lianliankan'));
+    ['ll-diff-easy', 'll-diff-medium', 'll-diff-hard'].forEach(id => {
+      $(id).addEventListener('click', () => simpleSetDiff('lianliankan', $(id).dataset.lldiff));
     });
     $('gomoku-undo').addEventListener('click', gmUndo);
     $('gomoku-restart').addEventListener('click', gmRestart);
@@ -1685,11 +1956,63 @@
     if (mjInst && mjInst.onDiffChange) mjInst.onDiffChange(d);
   }
 
+
+  /* ---------- 扫雷 / 2048 / 连连看（移植自 glass-games） ---------- */
+  const simpleGames = {
+    minesweeper: { win: 'MS',  icon: '⊞',
+      mountDiff: (inst,d)=>{ /* 扫雷 onDiffChange 自带重开 */ },
+    },
+    g2048: { win: 'GG', icon: 'Ⓑ' },
+    lianliankan: { win: 'LK', icon: '🀫' },
+  };
+  const simpleInst = {};   // key -> factory 实例
+  const simpleDiff = { minesweeper:'medium', g2048:'medium', lianliankan:'easy' };
+
+  function simpleSetStatus(key, t) {
+    const el = $(key === 'minesweeper' ? 'minesweeper-status' : key === 'g2048' ? 'g2048-status' : 'lianliankan-status');
+    if (el) el.textContent = t;
+  }
+  function simpleEnsure(key) {
+    if (simpleInst[key]) return;
+    const hostId = key === 'minesweeper' ? 'minesweeper-host' : key === 'g2048' ? 'g2048-host' : 'lianliankan-host';
+    const hostEl = $(hostId);
+    if (!hostEl) return;
+    const info = simpleGames[key];
+    const mod = typeof window !== 'undefined' ? window[info.win] : null;
+    if (!mod || !mod.factory) { simpleSetStatus(key, '引擎未加载'); return; }
+    try {
+      const inst = mod.factory();
+      inst.mount(hostEl, {
+        setStatus: t => simpleSetStatus(key, t),
+        onGameEnd: () => {},
+      });
+      if (inst.onDiffChange) inst.onDiffChange(simpleDiff[key]);
+      simpleInst[key] = inst;
+    } catch (e) { simpleSetStatus(key, '加载失败'); }
+  }
+  function simpleSetDiff(key, d) {
+    simpleDiff[key] = d;
+    const prefix = key === 'minesweeper' ? 'mn' : key === 'g2048' ? 'g48' : 'll';
+    ['easy','medium','hard'].forEach(x => {
+      const el = $(prefix + '-diff-' + x);
+      if (el) el.classList.toggle('on', x === d);
+    });
+    if (simpleInst[key] && simpleInst[key].onDiffChange) simpleInst[key].onDiffChange(d);
+  }
+  function simpleNewGame(key) {
+    simpleEnsure(key);
+    if (simpleInst[key] && simpleInst[key].onNewGame) simpleInst[key].onNewGame();
+  }
+  function simpleUndo(key) {
+    if (simpleInst[key] && simpleInst[key].undo) { if (!simpleInst[key].undo()) simpleSetStatus(key, '现在不能悔棋'); }
+  }
+
   function switchView(view) {
     const isGomoku = view === 'gomoku';
     const isXq = view === 'xiangqi';
     const isMj = view === 'mahjong';
-    const isGame = isGomoku || isXq || isMj;
+    const isSimple = ['minesweeper', 'g2048', 'lianliankan'].indexOf(view) >= 0;
+    const isGame = isGomoku || isXq || isMj || isSimple;
     const chat = $('chat-scroll'), bar = $('input-bar'), ps = $('pet-stage');
     if (chat) chat.style.display = isGame ? 'none' : '';
     if (bar) bar.style.display = isGame ? 'none' : '';
@@ -1700,11 +2023,19 @@
     if (xv) xv.style.display = isXq ? 'flex' : 'none';
     const mv = $('mahjong-view');
     if (mv) mv.style.display = isMj ? 'flex' : 'none';
+    $('view-mahjong-btn').classList.toggle('on', isMj);
+    // 三个单人游戏视图
+    const simpleViews = { minesweeper: 'minesweeper-view', g2048: 'g2048-view', lianliankan: 'lianliankan-view' };
+    const simpleBtns = { minesweeper: 'view-minesweeper-btn', g2048: 'view-g2048-btn', lianliankan: 'view-lianliankan-btn' };
+    for (const key in simpleViews) {
+      const v = $(simpleViews[key]);
+      if (v) v.style.display = (view === key) ? 'flex' : 'none';
+      const b = $(simpleBtns[key]);
+      if (b) b.classList.toggle('on', view === key);
+    }
     $('view-chat-btn').classList.toggle('on', !isGame);
     $('view-gomoku-btn').classList.toggle('on', isGomoku);
     $('view-xiangqi-btn').classList.toggle('on', isXq);
-    const mjBtn = $('view-mahjong-btn');
-    if (mjBtn) mjBtn.classList.toggle('on', isMj);
     if (isGomoku) {
       if (!gmBoard) gmInit();
       else gmDraw();
@@ -1717,6 +2048,7 @@
       mjEnsure();            // 首次进入才 mount
       mjResizeHost();        // 麻将模式自动放宽，四方桌才放得下
     }
+    if (isSimple) simpleEnsure(view);
   }
 
   function gmSetMode(mode) {

@@ -11,6 +11,7 @@ const files = [
   'settings.html', 'options.js',
   'background.js', 'welcome.html', 'welcome.js',
   'content.js', 'content_pet.js', 'xiangqi.js', 'mahjong.js',
+  'minesweeper.js', 'g2048.js', 'lianliankan.js',
   'icons'
 ];
 

@@ -221,7 +221,7 @@ chrome.commands.onCommand.addListener(async (command) => {
         if (chrome.scripting && chrome.scripting.executeScript) {
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ['xiangqi.js', 'mahjong.js', 'content_pet.js']
+            files: ['xiangqi.js', 'mahjong.js', 'minesweeper.js', 'g2048.js', 'lianliankan.js', 'content_pet.js']
           });
           setTimeout(() => {
             chrome.tabs.sendMessage(tab.id, { action: 'toggle-pet-widget' }).catch(() => {});
@@ -587,7 +587,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
       } catch {
         try {
-          await chrome.scripting.executeScript({ target: { tabId }, files: ['xiangqi.js', 'mahjong.js', 'content_pet.js'] });
+          await chrome.scripting.executeScript({ target: { tabId }, files: ['xiangqi.js', 'mahjong.js', 'minesweeper.js', 'g2048.js', 'lianliankan.js', 'content_pet.js'] });
           setTimeout(() => chrome.tabs.sendMessage(tabId, { action: 'show-pet-widget' }).catch(() => {}), 80);
           sendResponse({ ok: true });
         } catch (err) {
