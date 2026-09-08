@@ -10,7 +10,7 @@ const files = [
   'popup.html', 'popup.js',
   'settings.html', 'options.js',
   'background.js', 'welcome.html', 'welcome.js',
-  'content.js', 'content_pet.js', 'xiangqi.js',
+  'content.js', 'content_pet.js', 'xiangqi.js', 'mahjong.js',
   'icons'
 ];
 

@@ -221,7 +221,7 @@ chrome.commands.onCommand.addListener(async (command) => {
         if (chrome.scripting && chrome.scripting.executeScript) {
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ['xiangqi.js', 'content_pet.js']
+            files: ['xiangqi.js', 'mahjong.js', 'content_pet.js']
           });
           setTimeout(() => {
             chrome.tabs.sendMessage(tab.id, { action: 'toggle-pet-widget' }).catch(() => {});
@@ -517,6 +517,35 @@ ${moveList.join(', ')}
   throw new Error('模型未返回合法走法：' + text.slice(0, 40));
 }
 
+/* 麻将出牌：前端已构造好 system/user prompt，这里只负责转发给大模型并取回文本。
+   注意：max_tokens 至少给 200，避免开启思考模式时输出被截断。 */
+async function mahjongMove(messages, temperature, maxTokens) {
+  const cfg = await CORE.loadConfig();
+  if (!cfg.llmUrl || !cfg.llmKey) throw new Error('未配置 API');
+  const base = String(cfg.llmUrl).replace(/\/+$/, '');
+  const body = {
+    model: cfg.llmModel || undefined,
+    messages: Array.isArray(messages) ? messages : [],
+    temperature: Math.min(1.5, Math.max(0, Number(temperature) || 0.3)),
+    max_tokens: Math.max(200, Number(maxTokens) || 20),
+  };
+  if (cfg.llmThinking) { body.reasoning_effort = 'high'; body.thinking = { type: 'enabled' }; }
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.llmKey}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) {
+    let d = ''; try { d = (await res.clone().text()).slice(0, 120); } catch {}
+    throw new Error('HTTP ' + res.status + ' ' + d);
+  }
+  const json = await res.json();
+  const text = String((json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) || '').trim();
+  if (!text) throw new Error('模型返回为空');
+  return text;
+}
+
 /* ---------- 消息分发：摸鱼宠物 ---------- */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === 'gomoku-move') {
@@ -528,6 +557,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === 'xiangqi-move') {
     xiangqiMove(msg.board, msg.moves, msg.color)
       .then(move => sendResponse({ ok: true, move }))
+      .catch(err => sendResponse({ ok: false, error: String(err.message || err) }));
+    return true;
+  }
+  if (msg && msg.type === 'mahjong-move') {
+    mahjongMove(msg.messages, msg.temperature, msg.maxTokens)
+      .then(text => sendResponse({ ok: true, text }))
       .catch(err => sendResponse({ ok: false, error: String(err.message || err) }));
     return true;
   }
@@ -552,7 +587,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
       } catch {
         try {
-          await chrome.scripting.executeScript({ target: { tabId }, files: ['content_pet.js'] });
+          await chrome.scripting.executeScript({ target: { tabId }, files: ['xiangqi.js', 'mahjong.js', 'content_pet.js'] });
           setTimeout(() => chrome.tabs.sendMessage(tabId, { action: 'show-pet-widget' }).catch(() => {}), 80);
           sendResponse({ ok: true });
         } catch (err) {

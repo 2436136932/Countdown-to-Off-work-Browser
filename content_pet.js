@@ -329,6 +329,501 @@
         opacity: 0.45;
       }
       .resize-handle:hover { opacity: 0.9; }
+
+      /* 麻将视图容器（悬浮窗内） */
+      .mahjong-view {
+        flex: 1; display: flex; flex-direction: column;
+        gap: 6px; padding: 4px 8px 8px; min-height: 0; overflow: hidden;
+      }
+      .mahjong-host {
+        flex: 1; min-height: 0; overflow: hidden;
+        display: flex; flex-direction: column;
+      }
+      .mahjong-host > * { flex: 1; min-height: 0; }
+
+      /* ===== 红中麻将（移植自 glass-games，变量由 applyGlass 映射） ===== */
+      /* ---------- 红中麻将（112 张 · 赖子百搭 · 无吃只碰杠） ---------- */
+      .mj-root {
+        width: 100%; height: 100%;
+        display: flex; flex-direction: column; gap: 4px;
+        padding: 5px; box-sizing: border-box;
+        position: relative;    /* 胡牌定格/toast/飞行牌 的定位基准 */
+      }
+      
+      /* 四方桌：中央牌河 + 三家围三向（左=下家 上=对面 右=上家，你=下） */
+      .mj-tbl {
+        flex: 1; min-height: 0;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-rows: auto 1fr auto;
+        gap: 3px;
+      }
+      
+      .mj-pos {
+        border-radius: 8px; padding: 3px 4px;
+        text-align: center;
+        background: rgba(168, 172, 180, calc(0.03 + 0.08 * var(--glass-alpha)));
+        border: 1px solid rgba(120, 126, 138, calc(0.06 + 0.14 * var(--glass-alpha)));
+        transition: background 0.2s ease;
+        align-self: center;
+      }
+      
+      .mj-pos.pos-top { grid-area: 1 / 2; justify-self: center; min-width: 96px; }
+      
+      .mj-pos.pos-left { grid-area: 2 / 1; justify-self: start; min-width: 72px; }
+      
+      .mj-pos.pos-right { grid-area: 2 / 3; justify-self: end; min-width: 72px; }
+      
+      .mj-pos.active {
+        background: rgba(126, 144, 170, calc(0.10 + 0.22 * var(--glass-alpha)));
+        border-color: rgba(126, 144, 170, calc(0.30 + 0.35 * var(--glass-alpha)));
+      }
+      
+      .mj-pos .nm { font-size: 10px; color: rgba(29, 29, 31, calc(0.28 + 0.32 * var(--stone-ink))); }
+      
+      .mj-pos .cnt { font-size: 13px; font-weight: 600; font-family: var(--font); color: rgba(29, 29, 31, calc(0.40 + 0.40 * var(--stone-ink))); }
+      
+      .mj-pos .mj-melds { display: flex; gap: 2px; justify-content: center; flex-wrap: wrap; margin: 2px 0; }
+      
+      .mj-chip {
+        font-size: 9px; padding: 1px 3px; border-radius: 4px;
+        background: rgba(126, 144, 170, calc(0.10 + 0.18 * var(--glass-alpha)));
+        color: rgba(29, 29, 31, calc(0.35 + 0.35 * var(--stone-ink)));
+      }
+      
+      .mj-pos .last { font-size: 9px; color: rgba(29, 29, 31, calc(0.25 + 0.30 * var(--stone-ink))); }
+      
+      /* 中央牌河：四分区（上=对面 左=下家 右=上家 下=你） */
+      .mj-pool {
+        grid-area: 2 / 2;
+        min-height: 0;
+        overflow: hidden;
+        border-radius: 8px;
+        background: rgba(168, 172, 180, calc(0.02 + 0.05 * var(--glass-alpha)));
+      }
+      
+      .mj-pool-in {
+        width: 100%; height: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr 1fr;
+        gap: 2px;
+        padding: 3px;
+        box-sizing: border-box;
+      }
+      
+      .mj-zone { display: flex; gap: 2px; flex-wrap: wrap; align-content: flex-start; }
+      
+      .mj-zone.z2 { grid-area: 1 / 2; justify-content: center; }
+      
+      .mj-zone.z1 { grid-area: 2 / 1; justify-content: center; align-content: flex-start; }
+      
+      .mj-zone.z3 { grid-area: 2 / 3; justify-content: center; align-content: flex-start; }
+      
+      .mj-zone.z0 { grid-area: 3 / 2; justify-content: center; }
+      
+      .mj-meta {
+        flex: none; text-align: center; font-size: 10px;
+        color: rgba(29, 29, 31, calc(0.25 + 0.30 * var(--stone-ink)));
+      }
+      
+      .mj-handrow {
+        flex: none;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        min-height: 40px;
+      }
+      
+      .mj-hand {
+        flex: none;
+        display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;
+      }
+      
+      .mj-actions { flex: none; display: flex; gap: 6px; justify-content: center; min-height: 0; }
+      
+      .mj-tile {
+        display: flex; align-items: center; justify-content: center;
+        width: 26px; height: 36px;
+        border-radius: 4px;
+        font-size: 11px; font-weight: 600; font-family: var(--font);
+        user-select: none;
+        background: rgba(168, 172, 180, calc(0.06 + 0.18 * var(--glass-alpha)));
+        border: 1px solid rgba(120, 126, 138, calc(0.10 + 0.22 * var(--glass-alpha)));
+        color: rgba(29, 29, 31, calc(0.38 + 0.42 * var(--stone-ink)));
+      }
+      
+      .mj-tile.sm { width: 17px; height: 24px; font-size: 8.5px; }
+      
+      .mj-tile.sm.mine { border-color: rgba(198, 130, 122, calc(0.25 + 0.30 * var(--glass-alpha))); }
+      
+      /* 花色：低饱和区分（万=砖粉，条=灰绿，筒=灰蓝），赖子红中偏红 */
+      .mj-tile.s0 { color: rgba(168, 116, 112, calc(0.40 + 0.45 * var(--stone-ink))); }
+      
+      .mj-tile.s1 { color: rgba(112, 148, 132, calc(0.40 + 0.45 * var(--stone-ink))); }
+      
+      .mj-tile.s2 { color: rgba(112, 134, 168, calc(0.40 + 0.45 * var(--stone-ink))); }
+      
+      .mj-tile.lz {
+        color: rgba(198, 108, 100, calc(0.45 + 0.45 * var(--stone-ink)));
+        border-color: rgba(198, 108, 100, calc(0.20 + 0.30 * var(--glass-alpha)));
+      }
+      
+      .mj-tile.pick { cursor: pointer; }
+      
+      .mj-tile.pick:hover {
+        background: rgba(126, 144, 170, calc(0.14 + 0.28 * var(--glass-alpha)));
+        transform: translateY(-2px);
+      }
+      
+      .mj-tile.drawn {
+        margin-left: 5px;
+        border-color: rgba(126, 144, 170, calc(0.35 + 0.40 * var(--glass-alpha)));
+      }
+      
+      .mj-btn {
+        border: 1px solid rgba(120, 126, 138, calc(0.12 + 0.20 * var(--glass-alpha)));
+        border-radius: 8px; padding: 4px 14px;
+        font-size: 11.5px; font-family: var(--font); cursor: pointer;
+        background: rgba(168, 172, 180, calc(0.04 + 0.10 * var(--glass-alpha)));
+        color: rgba(29, 29, 31, calc(0.45 + 0.40 * var(--stone-ink)));
+      }
+      
+      .mj-btn.yes {
+        background: rgba(198, 130, 122, calc(0.14 + 0.26 * var(--glass-alpha)));
+        border-color: rgba(198, 130, 122, calc(0.35 + 0.35 * var(--glass-alpha)));
+      }
+      
+      .mj-btn:hover { filter: brightness(1.08); }
+      
+      /* ---------- 麻将 v2 界面优化：我的副露 / 最近出牌 / toast / 胡牌定格 ---------- */
+      .mj-mymeid {
+        flex: none;
+        min-height: 34px;
+        display: flex; align-items: center; justify-content: center;
+        gap: 8px;
+      }
+      
+      .mj-mymeid .mj-melds { display: flex; gap: 10px; }
+      
+      .mj-mset {
+        display: flex; align-items: center; gap: 1px;
+        background: rgba(168, 172, 180, calc(0.04 + 0.08 * var(--glass-alpha)));
+        border: 1px solid rgba(120, 126, 138, calc(0.06 + 0.12 * var(--glass-alpha)));
+        border-radius: 6px;
+        padding: 2px 3px;
+      }
+      
+      .mj-settag {
+        font-size: 9px; font-weight: 600;
+        padding: 1px 4px; border-radius: 4px; margin-right: 2px;
+      }
+      
+      .mj-settag.p { background: rgba(126,144,170, calc(0.14 + 0.24 * var(--glass-alpha))); color: rgba(29,29,31, calc(0.4 + 0.4 * var(--stone-ink))); }
+      
+      .mj-settag.g { background: rgba(198,130,122, calc(0.16 + 0.26 * var(--glass-alpha))); color: rgba(29,29,31, calc(0.4 + 0.4 * var(--stone-ink))); }
+      
+      .mj-tile.mini { width: 17px; height: 24px; font-size: 8.5px; border-radius: 3px; }
+      
+      .mj-tile.rot { transform: rotate(90deg); }
+      
+      /* 牌河最后一张：高亮边框（低饱和） */
+      .mj-tile.fresh {
+        border-color: rgba(126, 144, 170, calc(0.45 + 0.35 * var(--glass-alpha)));
+        box-shadow: 0 0 0 1px rgba(126,144,170, calc(0.25 + 0.3 * var(--glass-alpha)));
+      }
+      
+      /* 碰/杠 toast（居中，1.6s 淡出） */
+      .mj-toast {
+        position: absolute;
+        top: 34%;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        padding: 6px 16px;
+        border-radius: 10px;
+        font-size: 13px; font-weight: 500; font-family: var(--font);
+        background: rgba(252, 252, 254, calc(0.55 + 0.40 * var(--glass-alpha)));
+        -webkit-backdrop-filter: blur(8px) saturate(160%);
+        backdrop-filter: blur(8px) saturate(160%);
+        border: 1px solid rgba(120, 126, 138, calc(0.2 + 0.25 * var(--glass-alpha)));
+        color: rgba(29, 29, 31, calc(0.5 + 0.45 * var(--stone-ink)));
+        pointer-events: none;
+        white-space: nowrap;
+      }
+      
+      .mj-toast.anim { animation: mjToast 1.6s ease forwards; }
+      
+      /* 胡牌定格遮罩 */
+      .mj-huview {
+        position: absolute; inset: 0;
+        z-index: 30;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(250, 250, 252, calc(0.62 + 0.25 * var(--glass-alpha)));
+        -webkit-backdrop-filter: blur(6px) saturate(160%);
+        backdrop-filter: blur(6px) saturate(160%);
+      }
+      
+      .mj-huview[hidden] { display: none; }
+      
+      .mj-hucard {
+        min-width: 240px; max-width: 90%;
+        border-radius: 14px;
+        background: rgba(252, 252, 254, calc(0.80 + 0.18 * var(--glass-alpha)));
+        border: 1px solid rgba(120, 126, 138, calc(0.15 + 0.2 * var(--glass-alpha)));
+        padding: 14px 18px;
+        font-family: var(--font);
+      }
+      
+      .mj-hucard .mj-hutitle {
+        font-size: 14px; font-weight: 500;
+        color: rgba(29, 29, 31, calc(0.55 + 0.4 * var(--stone-ink)));
+        margin-bottom: 10px;
+      }
+      
+      .mj-hucard .mj-huline {
+        display: flex; gap: 8px; align-items: baseline;
+        font-size: 12px; line-height: 1.8;
+        color: rgba(29, 29, 31, calc(0.4 + 0.4 * var(--stone-ink)));
+      }
+      
+      .mj-hucard .mj-huline .lb {
+        flex: none; width: 34px; text-align: right;
+        font-size: 11px;
+        color: rgba(29, 29, 31, calc(0.28 + 0.30 * var(--stone-ink)));
+      }
+      
+      .mj-hucard .mj-huline b {
+        font-size: 15px;
+        color: rgba(198, 108, 100, calc(0.5 + 0.4 * var(--stone-ink)));
+      }
+      
+      .mj-hucard .tiles { word-break: break-all; }
+      
+      /* 出牌飞行动画牌 */
+      .mj-tile.fly {
+        position: absolute;   /* 坐标 = flyTile 里相对 .mj-root 计算（left/top） */
+        z-index: 25;
+        pointer-events: none;
+        transition: transform 0.22s ease, opacity 0.22s ease;
+        opacity: 1;
+        /* 低饱和描边，配合全局透明度 */
+        border: 1.5px solid rgba(126, 144, 170, calc(0.5 + 0.4 * var(--glass-alpha)));
+      }
+      
+      /* 暗杠 / 补杠按钮：低饱和警示色 */
+      .mj-btn.gang {
+        background: rgba(198, 130, 122, calc(0.16 + 0.28 * var(--glass-alpha)));
+        border-color: rgba(198, 130, 122, calc(0.35 + 0.35 * var(--glass-alpha)));
+      }
+      
+      .mj-btn.gang:hover { filter: brightness(1.08); }
+      
+      /* 手牌花色分组：组与组之间留白，读牌一目了然 */
+      .mj-hand .mj-grp {
+        display: flex; gap: 2px;
+      }
+      
+      .mj-hand .mj-grp + .mj-grp {
+        margin-left: 8px;
+      }
+      
+      /* ---------- 麻将四方桌视觉增强二期：牌背朝向 + 头像 + 微弹 ---------- */
+      .mj-pos { position: relative; }
+      
+      .mj-pos .bks {
+        display: flex; justify-content: center; gap: 2px;
+        margin-bottom: 3px;
+      }
+      
+      .mj-pos .bk {
+        display: inline-block;
+        width: 10px; height: 14px;
+        border-radius: 2px;
+        background: linear-gradient(135deg,
+          rgba(126, 144, 170, calc(0.25 + 0.35 * var(--glass-alpha))),
+          rgba(126, 144, 170, calc(0.10 + 0.20 * var(--glass-alpha))));
+        border: 1px solid rgba(120, 126, 138, calc(0.12 + 0.20 * var(--glass-alpha)));
+        transform-origin: center;
+      }
+      
+      /* 牌背朝向中央：左家立起朝右 / 上家倒置朝下 / 右家立起朝左 */
+      .mj-pos .bks.b-left .bk { transform: rotate(90deg); }
+      
+      .mj-pos .bks.b-top .bk { transform: rotate(180deg); }
+      
+      .mj-pos .bks.b-right .bk { transform: rotate(-90deg); }
+      
+      .mj-pos .avatar {
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        margin: 0 auto 2px;
+        box-shadow: 0 0 0 1px rgba(120, 126, 138, calc(0.2 + 0.3 * var(--glass-alpha)));
+      }
+      
+      /* 出牌/摸牌落位微弹（0.18s 弹性，摸鱼不夸张） */
+      .mj-tile.pop {
+        animation: mjPop 0.18s ease-out;
+      }
+      
+      /* ---------- 麻将一圈结算面板 + 四方积分 ---------- */
+      .mj-pos .cnt .sc { color: rgba(126, 144, 170, calc(0.5 + 0.4 * var(--stone-ink))); font-weight: 500; }
+      
+      .mj-result {
+        position: absolute; inset: 0;
+        z-index: 30;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(250, 250, 252, calc(0.62 + 0.25 * var(--glass-alpha)));
+        -webkit-backdrop-filter: blur(6px) saturate(160%);
+        backdrop-filter: blur(6px) saturate(160%);
+      }
+      
+      .mj-result[hidden] { display: none; }
+      
+      .mj-rscard {
+        min-width: 200px; max-width: 88%;
+        border-radius: 14px;
+        background: rgba(252, 252, 254, calc(0.80 + 0.18 * var(--glass-alpha)));
+        border: 1px solid rgba(120, 126, 138, calc(0.15 + 0.2 * var(--glass-alpha)));
+        padding: 14px 18px;
+        font-family: var(--font);
+        text-align: center;
+      }
+      
+      .mj-rs-title {
+        font-size: 14px; font-weight: 500;
+        color: rgba(29, 29, 31, calc(0.55 + 0.4 * var(--stone-ink)));
+        margin-bottom: 10px;
+      }
+      
+      .mj-rs-row {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        padding: 4px 0;
+        font-size: 12.5px;
+        color: rgba(29, 29, 31, calc(0.4 + 0.4 * var(--stone-ink)));
+      }
+      
+      .mj-rs-row.me {
+        background: rgba(126, 144, 170, calc(0.10 + 0.16 * var(--glass-alpha)));
+        border-radius: 8px;
+      }
+      
+      .mj-rs-row .medal { width: 16px; text-align: center; flex: none; }
+      
+      .mj-rs-row .name { flex: 1; text-align: left; }
+      
+      .mj-rs-row .pts { font-weight: 500; }
+      
+      .mj-rscard .mj-btn.yes { margin-top: 10px; width: 100%; }
+      
+      /* ---------- 麻将记牌器 + meta 行 + 小屏自适应 ---------- */
+      .mj-root { container-type: inline-size; }
+      
+      /* 小屏自适应基准 */
+      .mj-meta-row {
+        flex: none;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+        position: relative;
+      }
+      
+      .mj-cbtn {
+        border: 1px solid rgba(120, 126, 138, calc(0.14 + 0.20 * var(--glass-alpha)));
+        border-radius: 7px;
+        background: var(--ui-bg);
+        color: var(--ui-text-dim);
+        font-size: 10.5px; font-weight: 600; font-family: var(--font);
+        width: 20px; height: 20px; line-height: 1;
+        padding: 0;
+        cursor: pointer;
+      }
+      
+      .mj-cbtn:hover { background: var(--ui-bg-hover); color: var(--ui-text); }
+      
+      .mj-cbtn.on { background: var(--ui-active-bg); color: var(--ui-active-text); }
+      
+      /* 记牌器条：万/条/筒 + 各张剩余数 */
+      .mj-counter {
+        flex: none;
+        display: flex; align-items: center; justify-content: center;
+        flex-wrap: wrap; gap: 1px 5px;
+        padding: 2px 8px;
+        border-radius: 7px;
+        background: rgba(168, 172, 180, calc(0.03 + 0.06 * var(--glass-alpha)));
+        font-size: 9.5px;
+      }
+      
+      .mj-counter[hidden] { display: none; }
+      
+      .mj-counter .ct-suit {
+        font-size: 9px; font-weight: 600;
+        color: rgba(29, 29, 31, calc(0.30 + 0.34 * var(--stone-ink)));
+      }
+      
+      .mj-counter .ct-t {
+        display: inline-flex; align-items: baseline; gap: 1px;
+        font-family: var(--font);
+        color: rgba(29, 29, 31, calc(0.42 + 0.42 * var(--stone-ink)));
+      }
+      
+      .mj-counter .ct-t i {
+        font-style: normal; font-size: 8px;
+        color: rgba(126, 144, 170, calc(0.5 + 0.4 * var(--stone-ink)));
+      }
+      
+      .mj-counter .ct-t.none { opacity: 0.3; }
+      
+      .mj-counter .ct-t.none i { color: rgba(198, 108, 100, calc(0.45 + 0.4 * var(--stone-ink))); }
+      
+      /* 小屏自适应：窗口缩小到 ~400px 内，麻将整体收缩 */
+      @container (max-width: 400px) {
+        .mj-tile { width: 22px; height: 30px; font-size: 9.5px; }
+        .mj-tile.sm { width: 13px; height: 18px; font-size: 7px; }
+        .mj-tile.mini { width: 14px; height: 19px; font-size: 7px; }
+        .mj-pos.pos-top { min-width: 76px; }
+        .mj-pos.pos-left, .mj-pos.pos-right { min-width: 56px; }
+        .mj-pos { padding: 2px 3px; }
+        .mj-pos .nm { font-size: 9px; }
+        .mj-pos .cnt { font-size: 11px; }
+        .mj-hand { gap: 1px; }
+        .mj-hand .mj-grp + .mj-grp { margin-left: 4px; }
+        .mj-meta { font-size: 9px; }
+        .mj-pool-in { gap: 1px; padding: 2px; }
+        .mj-handrow { min-height: 34px; gap: 5px; }
+        .mj-counter { font-size: 8.5px; padding: 1px 6px; }
+      }
+      
+      /* ---------- 牌面重绘：数字 + 花色图案 + 听牌引导 ---------- */
+      .mj-tile {
+        flex-direction: column; gap: 0;
+        position: relative;
+        line-height: 1;
+      }
+      
+      .mj-tile .mj-num {
+        font-size: 15px; font-weight: 600;
+        line-height: 1.05;
+      }
+      
+      .mj-tile .mj-pat {
+        font-size: 11px; font-weight: 600;
+        line-height: 1;
+        opacity: 0.9;
+      }
+      
+      .mj-tile.sm .mj-num { font-size: 10px; }
+      
+      .mj-tile.sm .mj-pat { font-size: 7px; }
+      
+      .mj-tile.lz .mj-pat {
+        font-size: 16px; opacity: 1;
+        font-weight: 600;
+      }
+      
+      /* 花色底色微染：万=微红 条=微绿 筒=微蓝（低饱和，透明/墨色联动） */
+      .mj-tile.s0 { background: rgba(198, 130, 122, calc(0.10 + 0.14 * var(--glass-alpha))); }
+      
+      .mj-tile.s1 { background: rgba(112, 148, 132, calc(0.10 + 0.14 * var(--glass-alpha))); }
+      
+      .mj-tile.s2 { background: rgba(112, 134, 168, calc(0.10 + 0.14 * var(--glass-alpha))); }
+
     `;
     shadow.appendChild(style);
 
@@ -344,6 +839,7 @@
           <button class="topbar-btn on" id="view-chat-btn" title="聊天">💬</button>
           <button class="topbar-btn" id="view-gomoku-btn" title="和摸鱼兽下五子棋">♟</button>
           <button class="topbar-btn" id="view-xiangqi-btn" title="和摸鱼兽下象棋">♞</button>
+          <button class="topbar-btn" id="view-mahjong-btn" title="红中麻将（赖子·碰杠·自摸胡）">🀄</button>
           <button class="topbar-btn" id="reset-btn" title="清空聊天记录">新话题</button>
           <button class="topbar-btn primary" id="close-btn" title="关闭">✕</button>
         </div>
@@ -422,6 +918,30 @@
         </div>
         <div class="xiangqi-hint" id="xiangqi-hint">点己方棋子选中，再点目标格落子（你执红 ♔ · 摸鱼兽执黑 ♚）</div>
       </div>
+      <div class="mahjong-view" id="mahjong-view" style="display:none">
+        <div class="xiangqi-bar">
+          <span class="xiangqi-status" id="mahjong-status">红中麻将 · 摸打中</span>
+          <div class="xiangqi-actions">
+            <button class="topbar-btn" id="mahjong-undo" title="悔棋">悔棋</button>
+            <button class="topbar-btn" id="mahjong-restart" title="新局">新局</button>
+          </div>
+        </div>
+        <div class="xiangqi-bar">
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;opacity:.7">引擎</span>
+            <button class="chip-mini on" data-mjmode="local" id="mj-mode-local">本地</button>
+            <button class="chip-mini" data-mjmode="llm" id="mj-mode-llm">大模型</button>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;opacity:.7">难度</span>
+            <button class="chip-mini" data-mjdiff="easy" id="mj-diff-easy">简单</button>
+            <button class="chip-mini on" data-mjdiff="medium" id="mj-diff-medium">中等</button>
+            <button class="chip-mini" data-mjdiff="hard" id="mj-diff-hard">困难</button>
+          </div>
+        </div>
+        <div class="mahjong-host" id="mahjong-host"></div>
+        <div class="xiangqi-hint" id="mahjong-hint">点手牌打出 · 可碰/杠/自摸胡（红中是赖子，别打出去）</div>
+      </div>
     `;
     shadow.appendChild(panel);
 
@@ -494,6 +1014,19 @@
           ? `rgba(255,255,255,${Math.max(0.02, opacity * 0.16)})`
           : `rgba(255,255,255,${Math.max(0.10, opacity * 0.6)})`)
       : (isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.20)'));
+
+    /* 麻将 CSS 变量映射（移植自 glass-games）：让牌桌/牌面/文字跟随玻璃与皮肤联动 */
+    host.style.setProperty('--glass-alpha', String(opacity));
+    // 墨色（对比度）：跟玻璃联动，保证低透明度时麻将文字一起淡
+    host.style.setProperty('--stone-ink', String(Math.max(0.15, opacity)));
+    host.style.setProperty('--font', '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif');
+    host.style.setProperty('--ui-text', `rgba(${textBase}, ${textAlpha})`);
+    host.style.setProperty('--ui-text-dim', `rgba(${textBase}, ${subAlpha})`);
+    host.style.setProperty('--ui-bg', `rgba(${bgRgb}, ${tileOpacity})`);
+    host.style.setProperty('--ui-bg-hover', `rgba(${accentRgb}, ${accentSoft})`);
+    host.style.setProperty('--ui-active-bg', `rgba(${accentRgb}, ${accentSoft})`);
+    host.style.setProperty('--ui-active-text', `rgba(${textBase}, ${textAlpha})`);
+
     // 透明度变化 → 让当前显示的游戏棋盘/棋子立即套用新透明度
     try {
       const gv = $('gomoku-view'), xv = $('xiangqi-view');
@@ -682,6 +1215,20 @@
     $('view-chat-btn').addEventListener('click', () => switchView('chat'));
     $('view-gomoku-btn').addEventListener('click', () => switchView('gomoku'));
     $('view-xiangqi-btn').addEventListener('click', () => switchView('xiangqi'));
+    $('view-mahjong-btn').addEventListener('click', () => switchView('mahjong'));
+    $('mahjong-undo').addEventListener('click', () => {
+      if (mjInst && mjInst.undo) { if (!mjInst.undo()) mjSetStatus('现在不能悔棋'); }
+    });
+    $('mahjong-restart').addEventListener('click', () => {
+      mjEnsure();
+      if (mjInst && mjInst.onNewGame) mjInst.onNewGame();
+    });
+    ['mj-mode-local', 'mj-mode-llm'].forEach(id => {
+      $(id).addEventListener('click', () => mjSetMode($(id).dataset.mjmode));
+    });
+    ['mj-diff-easy', 'mj-diff-medium', 'mj-diff-hard'].forEach(id => {
+      $(id).addEventListener('click', () => mjSetDiff($(id).dataset.mjdiff));
+    });
     $('gomoku-undo').addEventListener('click', gmUndo);
     $('gomoku-restart').addEventListener('click', gmRestart);
     $('gomoku-canvas').addEventListener('click', gmOnClick);
@@ -1061,10 +1608,88 @@
   }
 
   /* ---------- 视图切换（聊天 / 五子棋 / 象棋） ---------- */
+  /* ---------- 红中麻将（移植自 glass-games） ---------- */
+  let mjInst = null;
+  let mjMode = 'local';
+  let mjDiff = 'medium';
+
+  function mjSetStatus(t) {
+    const el = $('mahjong-status');
+    if (el) el.textContent = t;
+  }
+  function mjHint(t) {
+    const el = $('mahjong-hint');
+    if (el) el.textContent = t;
+  }
+
+  // 麻将四方桌比五子棋/象棋占地方，进入时自动放宽悬浮窗（仍可用右下角手柄调）
+  function mjResizeHost() {
+    if (!panel) return;
+    const cur = parseInt(panel.style.width || '0', 10);
+    if (!cur || cur < 460) {
+      panel.style.width = '480px';
+      panel.style.height = Math.max(parseInt(panel.style.height || '0', 10) || 0, 620) + 'px';
+    }
+  }
+
+  // 大模型出牌：走 background 的 mahjong-move，失败由 mahjong.js 自己回退本地 AI
+  function mjLlm(messages, opts) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.sendMessage({
+          type: 'mahjong-move',
+          messages: messages,
+          temperature: (opts && opts.temperature) || 0.3,
+          maxTokens: (opts && opts.maxTokens) || 20
+        }, (res) => {
+          if (res && res.ok) resolve(String(res.text || ''));
+          else reject(new Error((res && res.error) || 'no response'));
+        });
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function mjEnsure() {
+    if (mjInst) return;
+    const hostEl = $('mahjong-host');
+    if (!hostEl) return;
+    if (typeof MJ === 'undefined' || !MJ.factory) {
+      mjSetStatus('麻将引擎未加载');
+      return;
+    }
+    try {
+      mjInst = MJ.factory();
+      mjInst.mount(hostEl, {
+        setStatus: mjSetStatus,
+        onGameEnd: () => {},
+        llm: mjLlm
+      });
+      mjInst.onModeChange(mjMode);
+      mjInst.onDiffChange(mjDiff);
+    } catch (e) {
+      mjSetStatus('麻将加载失败');
+    }
+  }
+
+  function mjSetMode(mode) {
+    mjMode = mode;
+    $('mj-mode-local').classList.toggle('on', mode === 'local');
+    $('mj-mode-llm').classList.toggle('on', mode === 'llm');
+    if (mjInst && mjInst.onModeChange) mjInst.onModeChange(mode);
+  }
+  function mjSetDiff(d) {
+    mjDiff = d;
+    $('mj-diff-easy').classList.toggle('on', d === 'easy');
+    $('mj-diff-medium').classList.toggle('on', d === 'medium');
+    $('mj-diff-hard').classList.toggle('on', d === 'hard');
+    if (mjInst && mjInst.onDiffChange) mjInst.onDiffChange(d);
+  }
+
   function switchView(view) {
     const isGomoku = view === 'gomoku';
     const isXq = view === 'xiangqi';
-    const isGame = isGomoku || isXq;
+    const isMj = view === 'mahjong';
+    const isGame = isGomoku || isXq || isMj;
     const chat = $('chat-scroll'), bar = $('input-bar'), ps = $('pet-stage');
     if (chat) chat.style.display = isGame ? 'none' : '';
     if (bar) bar.style.display = isGame ? 'none' : '';
@@ -1073,9 +1698,13 @@
     if (gv) gv.style.display = isGomoku ? 'flex' : 'none';
     const xv = $('xiangqi-view');
     if (xv) xv.style.display = isXq ? 'flex' : 'none';
+    const mv = $('mahjong-view');
+    if (mv) mv.style.display = isMj ? 'flex' : 'none';
     $('view-chat-btn').classList.toggle('on', !isGame);
     $('view-gomoku-btn').classList.toggle('on', isGomoku);
     $('view-xiangqi-btn').classList.toggle('on', isXq);
+    const mjBtn = $('view-mahjong-btn');
+    if (mjBtn) mjBtn.classList.toggle('on', isMj);
     if (isGomoku) {
       if (!gmBoard) gmInit();
       else gmDraw();
@@ -1083,6 +1712,10 @@
     if (isXq) {
       if (!xqBoard) xqInit(xqPlayer);
       else { xqSizeCanvas(); xqRender(); }
+    }
+    if (isMj) {
+      mjEnsure();            // 首次进入才 mount
+      mjResizeHost();        // 麻将模式自动放宽，四方桌才放得下
     }
   }
 
