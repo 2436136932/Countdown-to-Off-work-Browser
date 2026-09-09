@@ -102,6 +102,13 @@
         c[p] += 2;
         if (ok) return true;
       }
+      // 合肥红中规则：1 张真牌 + 1 张赖子 也可做将（赖子补将）
+      if (c[p] >= 1 && lz >= 1) {
+        c[p] -= 1;
+        const ok = decompose(c, lz - 1, need);
+        c[p] += 1;
+        if (ok) return true;
+      }
     }
     // 用 2 张赖子做将
     if (lz >= 2 && decompose(c, lz - 2, need)) return true;
