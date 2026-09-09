@@ -2007,6 +2007,11 @@
     if (simpleInst[key] && simpleInst[key].undo) { if (!simpleInst[key].undo()) simpleSetStatus(key, '现在不能悔棋'); }
   }
 
+  /* 视图切换走时释放单人游戏实例（2048 的 window keydown/mouseup 必须卸掉，否则劫持页面） */
+  function simpleRelease(key) {
+    if (simpleInst[key]) { try { if (simpleInst[key].destroy) simpleInst[key].destroy(); } catch (e) {} simpleInst[key] = null; }
+  }
+
   function switchView(view) {
     const isGomoku = view === 'gomoku';
     const isXq = view === 'xiangqi';
@@ -2028,6 +2033,12 @@
     const simpleViews = { minesweeper: 'minesweeper-view', g2048: 'g2048-view', lianliankan: 'lianliankan-view' };
     const simpleBtns = { minesweeper: 'view-minesweeper-btn', g2048: 'view-g2048-btn', lianliankan: 'view-lianliankan-btn' };
     for (const key in simpleViews) {
+      // 切走时：2048 有全局 window 监听，优先 setActive(false)（保留进度、不劫持页面），
+      // 没有 setActive 才 destroy 兜底；扫雷/连连看只在自身 DOM 上绑事件，隐藏即可
+      if (view !== key) {
+        if (key === 'g2048' && simpleInst.g2048 && simpleInst.g2048.setActive) simpleInst.g2048.setActive(false);
+        else if (key === 'g2048') simpleRelease(key);
+      }
       const v = $(simpleViews[key]);
       if (v) v.style.display = (view === key) ? 'flex' : 'none';
       const b = $(simpleBtns[key]);
@@ -2048,7 +2059,10 @@
       mjEnsure();            // 首次进入才 mount
       mjResizeHost();        // 麻将模式自动放宽，四方桌才放得下
     }
-    if (isSimple) simpleEnsure(view);
+    if (isSimple) {
+      simpleEnsure(view);
+      if (view === 'g2048' && simpleInst.g2048 && simpleInst.g2048.setActive) simpleInst.g2048.setActive(true);
+    }
   }
 
   function gmSetMode(mode) {

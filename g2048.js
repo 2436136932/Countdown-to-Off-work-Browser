@@ -18,6 +18,7 @@
     let gridEl = null;
     let dragStart = null;
     let onDown, onUp, onKey;
+    let active = true;    // 是否响应键盘/鼠标（切走视图时由宿主关闭，避免劫持页面）
 
     function reset() {
       N = SIZES[diff] || 4;
@@ -152,9 +153,9 @@
     }
 
     /* ---------- 交互：鼠标拖拽 + 键盘 ---------- */
-    onDown = (e) => { dragStart = { x: e.clientX, y: e.clientY }; };
+    onDown = (e) => { if (active) dragStart = { x: e.clientX, y: e.clientY }; };
     onUp = (e) => {
-      if (!dragStart) return;
+      if (!active || !dragStart) return;
       const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
       dragStart = null;
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
@@ -162,6 +163,8 @@
       else move(dy > 0 ? 'down' : 'up');
     };
     onKey = (e) => {
+      // 只在 2048 视图激活时响应；over 后按键直接放行（不再 preventDefault 也无效 move）
+      if (!active || over) return;
       const k = e.key;
       if (k === 'ArrowLeft' || k === 'a' || k === 'A') { move('left'); e.preventDefault(); }
       else if (k === 'ArrowRight' || k === 'd' || k === 'D') { move('right'); e.preventDefault(); }
@@ -192,6 +195,8 @@
       },
       onDiffChange(d) { if (d !== diff) { diff = d; reset(); } },
       onNewGame() { reset(); },
+      // 宿主调用：视图切走/切回时开关事件响应（避免劫持页面方向键/鼠标）
+      setActive(on) { active = !!on; if (!on) dragStart = null; },
       undo() {
         if (!hist.length) return false;
         restore(hist.pop());

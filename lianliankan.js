@@ -202,8 +202,13 @@
       if (sel.r === r && sel.c === c) { el.classList.remove('sel'); sel = null; return; }
 
       const a = sel, b = { r, c };
+      // 防 140ms 异步清除竞态：a 若已被清 0（快速连点时可能发生），改选 b 从新开始
+      if (!grid[a.r][a.c]) { clearSel(); sel = b; el.classList.add('sel'); return; }
+      if (a.r === r && a.c === c) { el.classList.remove('sel'); sel = null; return; }
+
       el.classList.add('sel');
-      if (t !== grid[a.r][a.c]) {
+      const tB = grid[r][c];
+      if (t !== tB) {
         // 图案不同：改选新的
         clearSel();
         sel = b; el.classList.add('sel');
