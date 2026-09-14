@@ -176,6 +176,10 @@
     }
 
     function newGame() {
+      // 一圈四局轮庄：东南西北各家轮流坐庄，第 5 局起回到第 0 庄家
+      if (roundInCircle >= 4) roundInCircle = 0;
+      banker = roundInCircle % 4;
+      roundInCircle++;
       wall = buildWall();
       players = [0, 1, 2, 3].map(i => ({
         seat: i, bot: i !== 0, concealed: [], melds: [], discards: [],
@@ -184,13 +188,9 @@
         for (let i = 0; i < 4; i++) players[(banker + i) % 4].concealed.push(wall.pop());
       }
       players[banker].concealed.push(wall.pop());   // 庄家 14 张
-      players.forEach(sortHand);
       turnIdx = banker; winner = -1; winTile = -1; selfDrawWin = false;
-      // 一圈四局轮庄：东南西北各家轮流坐庄，第 5 局起回到第 0 庄家
-      if (roundInCircle >= 4) roundInCircle = 0;
-      banker = roundInCircle % 4;
-      roundInCircle++;
       pending = null; claimQueue = []; drawn = null; undoStack = [];
+      players.forEach(sortHand);
       // 必须先清掉上一局的 over，否则 beginTurn 开头的守卫会直接 return，新局卡死
       phase = 'idle';
       clearClaimTick();
@@ -222,6 +222,16 @@
       const p = players[turnIdx];
       if (mustDraw) {
         if (!wall.length) return endGame(-1);       // 流局
+        // 防御：摸牌前手牌数不应超过 13（庄家开局第一手后也是 13，因为已经出过一张）
+        // 若异常 >14，说明上一回合出牌未成功移除，先不摸牌并强制玩家打出一张
+        if (p.concealed.length > 14) {
+          console.error('[mahjong] 手牌数量异常，跳过摸牌:', p.seat, p.concealed.length);
+          phase = 'turn';
+          render();
+          if (!p.bot) ctx.setStatus(`手牌 ${p.concealed.length} 张异常，请先打一张`);
+          else setTimeout(() => botDiscard(p), 420);
+          return;
+        }
         const t = wall.pop();
         p.concealed.push(t);
         drawn = { seat: p.seat, tile: t };
@@ -831,6 +841,11 @@
   function doDiscard(p, idx, fromEl) {
       if (phase !== 'turn') return;
       phase = 'discarding';            // 出牌锁：防止 240ms 空窗内重复出牌（快速连点/脚本轮询）
+      // 防御：idx 异常时修正为最后一张，避免牌没打出去导致张数不守恒
+      if (idx == null || idx < 0 || idx >= p.concealed.length) {
+        console.error('[mahjong] 出牌索引异常:', idx, p.concealed.length);
+        idx = p.concealed.length - 1;
+      }
       const t = p.concealed.splice(idx, 1)[0];
       p.discards.push(t);
       lastSeat = p.seat;               // 记录最近出牌人，render 高亮对应牌河分区
