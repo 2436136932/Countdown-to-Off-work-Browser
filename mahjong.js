@@ -115,8 +115,22 @@
     return false;
   }
 
-  function meldTiles(p) { return p.melds.reduce((n, m) => n + (m.type === 'gang' ? 4 : 3), 0); }
-  function isWin(p) { return canWinTiles(p.concealed, p.melds.length); }
+  /** 一副副露的真实张数：碰 3 张、杠 4 张（含补杠后升为 4 张） */
+  function meldSize(m) { return m.type === 'gang' ? 4 : 3; }
+
+  /** 一副副露实际持有的实体牌数组（旧存档无 tiles 字段时按张数兜底合成） */
+  function meldTilesOf(m) {
+    if (Array.isArray(m.tiles)) return m.tiles;
+    return new Array(meldSize(m)).fill(m.tile);   // 兜底：不应发生，仅防旧快照反序列化
+  }
+
+  /** 副露总张数（与全局张数守恒一致：所有牌只在 concealed ∪ melds.tiles ∪ discards ∪ wall 之一） */
+  function meldTiles(p) { return p.melds.reduce((n, m) => n + meldSize(m), 0); }
+
+  function isWin(p) {
+    // 手牌 + 副露实体牌必须等于 need*3+2，才谈得上胡（副露按真实张数，不是条数）
+    return canWinTiles(p.concealed, p.melds.length);
+  }
   function canHuOn(p, tile) {
     p.concealed.push(tile);
     const ok = isWin(p);
@@ -141,6 +155,43 @@
     let lastSeat = 0;                         // 最近出牌人（牌河分区高亮）
     let stats = { games: 0, win: 0, selfDraw: 0, total: 0 };   // 本地统计
     let score = [0, 0, 0, 0];                     // 累计积分（一圈内各家）
+    let stateGen = 0;                             // 状态代数：悔棋/开新局时 +1，用于作废旧定时器
+
+    /* ---------- 张数守恒断言（开发期自检） ---------- */
+    /** 全桌实体牌总数：应为 112（108 真牌 + 4 赖子），任何一步都不例外。
+     *  注意：这里刻意统计"真实持有的牌"——
+     *  - 副露只数真实存在的 tiles 元素，缺 tiles 字段的旧副露按 0 计（而不是按 type 合成），
+     *    否则断言会自我满足、永远发现不了丢牌。
+     *  - 手牌 + 牌河 + 副露实体牌 + 牌墙 必须严格等于 112。 */
+    function totalTiles() {
+      let n = wall.length;
+      for (const p of players) {
+        n += p.concealed.length + p.discards.length;
+        for (const m of p.melds) n += Array.isArray(m.tiles) ? m.tiles.length : 0;
+      }
+      return n;
+    }
+
+    /** 守恒断言：不等就报错。用于定位"15 张胡不了"这类账目错乱 */
+    function assertConservation(where) {
+      const n = totalTiles();
+      if (n !== 112) {
+        console.error(`[mahjong] 张数守恒被破坏 @${where}: 全桌 ${n} 张（应为 112）`);
+      }
+      return n;
+    }
+
+    /** 排一个"可被作废"的延时回调。
+     *  悔棋/开新局会让已排队的定时器拿着旧 player 对象继续操作，
+     *  导致牌被从已废弃的对象里打出去（真实手牌却没少）→ 手牌越打越多（19 张）。
+     *  这里把当时的 stateGen 记下来，回调触发时若代数已变就直接丢弃。 */
+    function deferred(fn, ms) {
+      const gen = stateGen;
+      return setTimeout(() => {
+        if (gen !== stateGen) return;      // 状态已被悔棋/新局作废
+        fn();
+      }, ms);
+    }
 
     /* ---------- 建牌墙 / 发牌 ---------- */
     function buildWall() {
@@ -181,6 +232,7 @@
       banker = roundInCircle % 4;
       roundInCircle++;
       wall = buildWall();
+      stateGen++;                       // 开新局：作废上一局残留的所有延时回调
       players = [0, 1, 2, 3].map(i => ({
         seat: i, bot: i !== 0, concealed: [], melds: [], discards: [],
       }));
@@ -222,15 +274,11 @@
       const p = players[turnIdx];
       if (mustDraw) {
         if (!wall.length) return endGame(-1);       // 流局
-        // 防御：摸牌前手牌数不应超过 13（庄家开局第一手后也是 13，因为已经出过一张）
-        // 若异常 >14，说明上一回合出牌未成功移除，先不摸牌并强制玩家打出一张
-        if (p.concealed.length > 14) {
-          console.error('[mahjong] 手牌数量异常，跳过摸牌:', p.seat, p.concealed.length);
-          phase = 'turn';
-          render();
-          if (!p.bot) ctx.setStatus(`手牌 ${p.concealed.length} 张异常，请先打一张`);
-          else setTimeout(() => botDiscard(p), 420);
-          return;
+        // 摸牌前手牌必须是 13 - 3*副露条数（庄家开局首轮除外，由 newGame 处理）
+        const base = 13 - 3 * p.melds.length;
+        if (p.concealed.length !== base) {
+          console.error('[mahjong] 摸牌前张数异常:', p.seat, p.concealed.length, '应为', base);
+          assertConservation('beginTurn');
         }
         const t = wall.pop();
         p.concealed.push(t);
@@ -249,7 +297,7 @@
       }
       phase = 'turn';
       render();
-      if (p.bot) setTimeout(() => botDiscard(p), 420);
+      if (p.bot) deferred(() => botDiscard(p), 420);
       else {
         // 暗杠：回合开始、非刚玩成副露时，手牌有 4 张同真牌可暗杠
         const g4 = findQuad(p);
@@ -279,8 +327,10 @@
       p.concealed.forEach((x, i) => { if (x === tile) quad.push(i); });
       if (quad.length < 4) return;
       for (let i = quad.length - 1; i >= 0; i--) p.concealed.splice(quad[i], 1);
-      p.melds.push({ type: 'gang', tile, from: 0, dark: true });
+      // 暗杠：4 张实体牌全部进副露
+      p.melds.push({ type: 'gang', tile, from: 0, dark: true, tiles: [tile, tile, tile, tile] });
       showToast(`你暗杠 ${tileLabel(tile)}`);
+      assertConservation('doAnGang');
       if (wall.length) {
         const t = wall.pop();
         p.concealed.push(t);
@@ -298,14 +348,19 @@
       ctx.setStatus('你杠了，摸了一张，点一张打出去');
     }
 
-    /** 补杠：之前碰过的牌，手里又摸到第 4 张 */
+    /** 补杠：之前碰过的牌，手里又摸到第 4 张 → 碰(3张) 升级为 杠(4张) */
     function doBuGang(m) {
       const p = players[0];
       const idx = p.concealed.indexOf(m.tile);
       if (idx < 0) return;
       p.concealed.splice(idx, 1);
       m.bugang = true;
+      // 关键修复：type 升为 gang，并把第 4 张实体牌补进副露，账目（3→4 张）同步
+      m.type = 'gang';
+      if (!Array.isArray(m.tiles)) m.tiles = new Array(3).fill(m.tile);
+      m.tiles.push(m.tile);
       showToast(`你补杠 ${tileLabel(m.tile)}`);
+      assertConservation('doBuGang');
       if (wall.length) {
         const t = wall.pop();
         p.concealed.push(t);
@@ -405,11 +460,11 @@
         for (let i = 0; i < 27; i++) {
           if (c[i] >= 4) {
             for (let k = 0; k < 4; k++) p.concealed.splice(p.concealed.indexOf(i), 1);
-            p.melds.push({ type: 'gang', tile: i, from: p.seat, dark: true });
+            p.melds.push({ type: 'gang', tile: i, from: p.seat, dark: true, tiles: [i, i, i, i] });
             if (wall.length) { const t = wall.pop(); p.concealed.push(t); drawn = { seat: p.seat, tile: t }; }
             if (isWin(p)) return endGame(p.seat, drawn ? drawn.tile : -1, true);
             render();
-            setTimeout(() => botDiscard(p), 420);
+            deferred(() => botDiscard(p), 420);
             return;
           }
         }
@@ -546,7 +601,7 @@
       const seen = new Array(28).fill(0);
       for (let s2 = 0; s2 < 4; s2++) {
         for (const t of players[s2].discards) seen[t]++;
-        for (const m of players[s2].melds) seen[m.tile] += m.type === 'gang' ? 4 : 3;
+        for (const m of players[s2].melds) for (const mt of meldTilesOf(m)) seen[mt]++;
       }
       // 自己的手牌也算"可见"（自己知道）
       for (const t of players[0].concealed) seen[t]++;
@@ -622,9 +677,14 @@
           label.className = 'mj-settag ' + (m.type === 'gang' ? 'g' : 'p');
           label.textContent = m.type === 'gang' ? '杠' : '碰';
           g.appendChild(label);
-          const n = m.type === 'gang' ? 3 : 2;
-          for (let k = 0; k < n; k++) g.appendChild(tileEl(m.tile, 'mini'));
-          g.appendChild(tileEl(m.tile, 'mini rot'));   // 横牌标来源
+          const ts = meldTilesOf(m);
+          // 最后一张横放标来源（碰/杠都是 3 竖 + 1 横）；暗杠 4 张扣放
+          if (m.dark) {
+            for (let k = 0; k < ts.length; k++) g.appendChild(tileEl(ts[k], 'mini'));
+          } else {
+            for (let k = 0; k < ts.length - 1; k++) g.appendChild(tileEl(ts[k], 'mini'));
+            g.appendChild(tileEl(ts[ts.length - 1], 'mini rot'));
+          }
           wrap2.appendChild(g);
         });
         els.mymeld.appendChild(wrap2);
@@ -796,7 +856,7 @@
     function calcFan(p, self) {
       const names = [];
       let fan = 1;                                  // 平胡打底
-      const all = p.concealed.concat(p.melds.map(m => m.tile));
+      const all = p.concealed.concat(p.melds.reduce((a, m) => a.concat(meldTilesOf(m)), []));
       // 清一色：所有牌（含副露）同花色或赖子
       const suits = new Set(all.filter(t => t !== LAIZI).map(t => Math.floor(t / 9)));
       if (suits.size === 1) { names.push('清一色'); fan += 4; }
@@ -851,9 +911,10 @@
       lastSeat = p.seat;               // 记录最近出牌人，render 高亮对应牌河分区
       drawn = null;
       if (!p.bot) sortHand(p);
+      assertConservation('doDiscard');
       render();
       flyTile(t, fromEl || (p.bot ? oppElFor(p.seat) : null));
-      setTimeout(() => checkClaims(p.seat, t), 240);
+      deferred(() => checkClaims(p.seat, t), 240);
     }
 
     /** 出牌后：按 杠 > 碰 询问各家（合肥红中规则：只允许自摸胡，点炮不能胡） */
@@ -895,15 +956,37 @@
 
     function applyMeld(p, tile, type, fromSeat) {
       const from = players[fromSeat];
-      if (from.discards.length) from.discards.pop();     // 从牌河拿走
-      const n = type === 'gang' ? 3 : 2;
-      for (let i = 0; i < n; i++) {
-        const idx = p.concealed.indexOf(tile);
-        if (idx >= 0) p.concealed.splice(idx, 1);
+      // 碰/杠都需要 3 张同牌：手里 2 张 + 牌河 1 张（碰）/ 3 张 + 牌河 1 张（明杠）
+      const need = type === 'gang' ? 3 : 2;
+      if (countOf(p.concealed, tile) < need) {
+        console.error('[mahjong] applyMeld 手牌不足，放弃副露:', tileLabel(tile), type);
+        processClaimQueue();
+        return;
       }
-      p.melds.push({ type, tile, from: fromSeat });
+      // 先把手里那几张拿出来（实体牌，一张都不能丢）
+      const taken = [];
+      for (let i = 0; i < need; i++) {
+        const idx = p.concealed.indexOf(tile);
+        if (idx < 0) break;
+        taken.push(p.concealed.splice(idx, 1)[0]);
+      }
+      // 关键修复：牌河那张必须被吸收进副露，而不是 pop 掉就消失
+      let claimed = null;
+      if (from.discards.length) claimed = from.discards.pop();
+      // 牌河为空说明状态已被回滚（悔棋），绝不能凭空造一张牌凑数 → 直接放弃副露
+      if (claimed == null) {
+        console.error('[mahjong] applyMeld 牌河为空，放弃副露（疑似悔棋竞态）');
+        taken.forEach(t => p.concealed.push(t));   // 把已拿出的牌还回去，保证守恒
+        processClaimQueue();
+        return;
+      }
+      // 实体牌进副露：碰 3 张 / 杠 4 张，一张不多一张不少
+      const tiles = taken.slice();
+      tiles.push(claimed);
+      p.melds.push({ type, tile, from: fromSeat, tiles });
       turnIdx = p.seat;
       pending = null;
+      assertConservation('applyMeld');
       // 碰/杠 toast（谁碰了什么，一眼可见）
       showToast(`${SEAT_NAME[p.seat]}${type === 'gang' ? '杠' : '碰'} ${tileLabel(tile)}`);
 
@@ -912,6 +995,7 @@
         p.concealed.push(t);
         drawn = { seat: p.seat, tile: t };
         if (!p.bot) sortHand(p);
+        assertConservation('applyMeld:gang-draw');
         if (isWin(p)) {
           if (p.bot) return endGame(p.seat, t, true);    // AI 杠上开花自动
           phase = 'win'; winTile = t;                    // 玩家：等点胡
@@ -922,7 +1006,7 @@
       }
       phase = 'turn';
       render();
-      if (p.bot) setTimeout(() => botDiscard(p), 420);
+      if (p.bot) deferred(() => botDiscard(p), 420);
       else ctx.setStatus('点一张牌打出去');
     }
 
@@ -981,6 +1065,13 @@
           phase, turn: turnIdx, wall: wall.length, winner,
           hands: players.map(p => p.concealed.length),
           melds: players.map(p => p.melds.length),
+          // 守恒：全桌实体牌总数必须恒为 112（15 张牌的账目错乱会在这里暴露）
+          total: totalTiles(),
+          seatTotal: players.map(p => p.concealed.length + p.discards.length + meldTiles(p)),
+          // 副露完整性：一副副露里的实体牌必须全部同牌；错位说明账目/竞态被破坏
+          meldBad: players.reduce((n, p) =>
+            n + p.melds.filter(m => meldTilesOf(m).some(t => t !== m.tile)).length, 0),
+          lastSeat,
           pool: players.reduce((n, p) => n + p.discards.length, 0),
           poolLaizi: players.reduce((n, p) => n + p.discards.filter(t => t === LAIZI).length, 0),
           canDiscard: phase === 'turn' && turnIdx === 0,
@@ -1058,8 +1149,9 @@
       undo() {
         if (!undoStack.length) return false;
         restore(undoStack.pop());
-        render();
-        ctx.setStatus('悔了一步（收回刚打出的牌）');
+      stateGen++;                       // 作废所有已排队的延时回调（AI 出牌 / 碰杠询问等）
+      render();
+      ctx.setStatus('悔了一步（收回刚打出的牌）');
         return true;
       },
     };
