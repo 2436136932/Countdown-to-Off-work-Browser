@@ -258,6 +258,7 @@
         wall, players, turnIdx, banker, phase,
         drawn, pending, claimQueue, claimTile, claimFrom,
         winner, winTile, selfDrawWin,
+        lastSeat,                       // 最近出牌人：牌河高亮 + AI 防喂牌都依赖它
       });
     }
     function restore(s) {
@@ -266,6 +267,8 @@
       phase = o.phase; drawn = o.drawn; pending = o.pending;
       claimQueue = o.claimQueue; claimTile = o.claimTile; claimFrom = o.claimFrom;
       winner = o.winner; winTile = o.winTile; selfDrawWin = o.selfDrawWin;
+      // 旧快照可能没有 lastSeat：兜底为当前值，避免悔棋后高亮/防喂牌错位
+      lastSeat = (typeof o.lastSeat === 'number') ? o.lastSeat : lastSeat;
     }
 
     /* ---------- 回合流程 ---------- */

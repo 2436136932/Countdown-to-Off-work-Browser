@@ -109,7 +109,7 @@ function rnd() { rng = (rng * 1103515245 + 12345) & 0x7fffffff; return rng / 0x7
     llm: () => Promise.reject('no-llm'),
   });
 
-  let badTotal = 0, badMeld = 0, maxHand = 0, raceMelded = 0;
+  let badTotal = 0, badMeld = 0, maxHand = 0, raceMelded = 0, badLastSeat = 0;
   function check(st, tag) {
     if (st.total !== 112) {
       badTotal++;
@@ -118,6 +118,12 @@ function rnd() { rng = (rng * 1103515245 + 12345) & 0x7fffffff; return rng / 0x7
     if (st.meldBad > 0) {
       badMeld++;
       if (badMeld <= 3) console.log('    [' + tag + '] 副露错位 ' + st.meldBad + ' 副');
+    }
+    // lastSeat 只需是合法座位即可（牌河可能因碰/杠被清空，渲染已做守卫）；
+    // 「悔棋后 lastSeat 是否精确回滚」由 test-mj-lastseat.js 专项覆盖
+    if (!(st.lastSeat >= 0 && st.lastSeat <= 3)) {
+      badLastSeat++;
+      if (badLastSeat <= 3) console.log('    [' + tag + '] lastSeat 非法: ' + st.lastSeat);
     }
     maxHand = Math.max(maxHand, ...st.hands);
   }
@@ -171,6 +177,7 @@ function rnd() { rng = (rng * 1103515245 + 12345) & 0x7fffffff; return rng / 0x7
   ok('悔棋前后全桌牌数恒为 112', badTotal === 0, badTotal + ' 次偏离');
   ok('悔棋不会造成副露错位', badMeld === 0, badMeld + ' 次错位');
   ok('悔棋不会让手牌超过 14 张', maxHand <= 14, '最大 ' + maxHand + ' 张');
+  ok('悔棋后 lastSeat 仍指向有牌河的玩家', badLastSeat === 0, badLastSeat + ' 次错位');
   ok('引擎无守恒报错', consErr.length === 0, consErr.slice(0, 3).join(' | '));
 
   console.error = origError;
