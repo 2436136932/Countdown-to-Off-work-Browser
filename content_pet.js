@@ -58,7 +58,7 @@
         position: fixed;
         left: 24px;
         top: 24px;
-        width: 320px;
+        width: 336px;
         max-height: 92vh;
         display: flex;
         flex-direction: column;
@@ -88,7 +88,7 @@
 
       .topbar {
         display: flex; align-items: center; justify-content: flex-end;
-        padding: 8px 10px 6px; flex-shrink: 0;
+        padding: 8px 12px 6px; flex-shrink: 0;
         cursor: grab;
       }
       .topbar:active { cursor: grabbing; }
@@ -111,6 +111,11 @@
         font-size: 12px; font-weight: 600;
         cursor: pointer; font-family: inherit;
         transition: background .15s ease, transform .1s ease;
+      }
+      .topbar-btn.icon-btn {
+        width: 27px; height: 26px; padding: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 12.5px; border-radius: 8px; flex-shrink: 0;
       }
       .topbar-btn:hover { background: rgba(120, 120, 128, 0.24); }
       .topbar-btn:active { transform: scale(0.96); }
@@ -1031,16 +1036,16 @@
           <span class="online-dot"></span>
           <span class="topbar-title">摸鱼兽聊天室 🐾</span>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button class="topbar-btn on" id="view-chat-btn" title="聊天">💬</button>
-          <button class="topbar-btn" id="view-gomoku-btn" title="和摸鱼兽下五子棋">♟</button>
-          <button class="topbar-btn" id="view-xiangqi-btn" title="和摸鱼兽下象棋">♞</button>
-          <button class="topbar-btn" id="view-mahjong-btn" title="红中麻将（赖子·碰杠·自摸胡）">🀄</button>
-          <button class="topbar-btn" id="view-minesweeper-btn" title="扫雷">⊞</button>
-          <button class="topbar-btn" id="view-g2048-btn" title="2048">Ⓑ</button>
-          <button class="topbar-btn" id="view-lianliankan-btn" title="连连看">🀫</button>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button class="topbar-btn icon-btn on" id="view-chat-btn" title="聊天">💬</button>
+          <button class="topbar-btn icon-btn" id="view-gomoku-btn" title="和摸鱼兽下五子棋">♟</button>
+          <button class="topbar-btn icon-btn" id="view-xiangqi-btn" title="和摸鱼兽下象棋">♞</button>
+          <button class="topbar-btn icon-btn" id="view-mahjong-btn" title="红中麻将（赖子·碰杠·自摸胡）">🀄</button>
+          <button class="topbar-btn icon-btn" id="view-minesweeper-btn" title="扫雷">⊞</button>
+          <button class="topbar-btn icon-btn" id="view-g2048-btn" title="2048">Ⓑ</button>
+          <button class="topbar-btn icon-btn" id="view-lianliankan-btn" title="连连看">🀫</button>
           <button class="topbar-btn" id="reset-btn" title="清空聊天记录">新话题</button>
-          <button class="topbar-btn primary" id="close-btn" title="关闭">✕</button>
+          <button class="topbar-btn icon-btn primary" id="close-btn" title="关闭">✕</button>
         </div>
       </div>
       <div class="pet-stage" id="pet-stage">
@@ -1182,6 +1187,7 @@
         <div class="xiangqi-bar">
           <span class="xiangqi-status" id="lianliankan-status">连连看 · 点两个相同图案消除</span>
           <div class="xiangqi-actions">
+            <button class="topbar-btn" id="lianliankan-undo" title="悔棋">悔棋</button>
             <button class="topbar-btn" id="lianliankan-restart" title="新局">新局</button>
           </div>
         </div>
@@ -1496,6 +1502,7 @@
     ['g48-diff-easy', 'g48-diff-medium', 'g48-diff-hard'].forEach(id => {
       $(id).addEventListener('click', () => simpleSetDiff('g2048', $(id).dataset.g48diff));
     });
+    $('lianliankan-undo').addEventListener('click', () => simpleUndo('lianliankan'));
     $('lianliankan-restart').addEventListener('click', () => simpleNewGame('lianliankan'));
     ['ll-diff-easy', 'll-diff-medium', 'll-diff-hard'].forEach(id => {
       $(id).addEventListener('click', () => simpleSetDiff('lianliankan', $(id).dataset.lldiff));
@@ -2022,10 +2029,11 @@
     const isMj = view === 'mahjong';
     const isSimple = ['minesweeper', 'g2048', 'lianliankan'].indexOf(view) >= 0;
     const isGame = isGomoku || isXq || isMj || isSimple;
-    const chat = $('chat-scroll'), bar = $('input-bar'), ps = $('pet-stage');
+    const chat = $('chat-scroll'), bar = $('input-bar'), ps = $('pet-stage'), rst = $('reset-btn');
     if (chat) chat.style.display = isGame ? 'none' : '';
     if (bar) bar.style.display = isGame ? 'none' : '';
     if (ps) ps.style.display = isGame ? 'none' : ''; // 游戏视图下隐藏摸鱼兽卡片，避免抢戏
+    if (rst) rst.style.display = isGame ? 'none' : ''; // 游戏视图下隐藏新话题按钮，避免挤占顶栏并造成误导
     const gv = $('gomoku-view');
     if (gv) gv.style.display = isGomoku ? 'flex' : 'none';
     const xv = $('xiangqi-view');
@@ -2492,12 +2500,12 @@
   /* ---------- 监听来自 Background / Popup 的消息 ---------- */
   chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
     if (!req) return;
-    if (req.action === 'show-pet-widget') { showPanel(); sendResponse({ ok: true }); return true; }
-    if (req.action === 'hide-pet-widget') { hidePanel(true); sendResponse({ ok: true }); return true; }
+    if (req.action === 'show-pet-widget') { showPanel(); if (sendResponse) sendResponse({ ok: true }); return true; }
+    if (req.action === 'hide-pet-widget') { hidePanel(true); if (sendResponse) sendResponse({ ok: true }); return true; }
     if (req.action === 'toggle-pet-widget') {
       if (!panel || panel.classList.contains('hidden')) showPanel();
       else hidePanel(true);
-      sendResponse({ ok: true }); return true;
+      if (sendResponse) sendResponse({ ok: true }); return true;
     }
   });
 
