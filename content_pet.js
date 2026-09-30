@@ -719,7 +719,7 @@
       
       .mj-tile.mini { width: 17px; height: 24px; font-size: 8.5px; border-radius: 3px; }
       
-      .mj-tile.rot { transform: rotate(90deg); }
+      .mj-tile.rot { transform: rotate(90deg); margin: 0 4px; }
       
       /* 牌河最后一张：高亮边框（低饱和） */
       .mj-tile.fresh {
