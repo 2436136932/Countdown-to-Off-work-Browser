@@ -54,6 +54,25 @@
     const style = document.createElement('style');
     style.textContent = `
       :host { all: initial; }
+      /* 全局滚动条：极细 4px、轨道全透、滑块透明度与 --glass-alpha 联动，随设置一起变淡隐形 */
+      *::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      *::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      *::-webkit-scrollbar-thumb {
+        background: rgba(120, 126, 138, calc(0.06 + 0.28 * var(--glass-alpha, 0.6)));
+        border-radius: 999px;
+      }
+      *::-webkit-scrollbar-thumb:hover {
+        background: rgba(120, 126, 138, calc(0.16 + 0.38 * var(--glass-alpha, 0.6)));
+      }
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(120, 126, 138, calc(0.06 + 0.28 * var(--glass-alpha, 0.6))) transparent;
+      }
       .floating-window {
         position: fixed;
         left: 24px;
@@ -166,8 +185,6 @@
         display: flex; flex-direction: column; gap: 10px;
         scroll-behavior: smooth; min-height: 80px;
       }
-      .chat-scroll::-webkit-scrollbar { width: 4px; }
-      .chat-scroll::-webkit-scrollbar-thumb { background: rgba(120,120,128,0.3); border-radius: 2px; }
 
       .msg { display: flex; gap: 8px; align-items: flex-end; max-width: 82%; }
       .msg.pet { align-self: flex-start; }
