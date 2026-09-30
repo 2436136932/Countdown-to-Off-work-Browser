@@ -1544,8 +1544,10 @@
   let gmMode = 'local';            // local | llm
   let gmDiff = 'medium';           // easy | medium | hard
   let gmLast = null;               // 最后一手，用于标记
+  let gmGen = 0;                   // 局代数：重开时自增，作废未完成的 AI 定时器/请求
 
   function gmInit() {
+    gmGen++;
     gmBoard = Array.from({ length: GM_N }, () => Array(GM_N).fill(GM_EMPTY));
     gmHistory = [];
     gmTurn = GM_BLACK;
@@ -1767,11 +1769,13 @@
   function gmPlayAI() {
     if (gmOver || gmBusy) return;
     gmBusy = true;
+    const curGen = gmGen;
     gmSetStatus(gmMode === 'llm' ? '摸鱼兽（大模型）思考中…' : '摸鱼兽思考中…', false);
     const canvas = $('gomoku-canvas');
     if (canvas) canvas.classList.add('waiting');
 
     const finishWith = (move, note) => {
+      if (curGen !== gmGen) return; // 局已重开，放弃旧回调
       gmBusy = false;
       if (canvas) canvas.classList.remove('waiting');
       if (note) gmHint(note);
@@ -2121,8 +2125,10 @@
   let xqDests = [];        // 选中棋子的合法落点 [{r,c}]
   let xqLast = null;       // 最后一手，用于标记
   let xqCell = 28, xqPad = 14;
+  let xqGen = 0;           // 局代数：重开时自增，作废未完成的 AI 定时器/请求
 
   function xqInit(player) {
+    xqGen++;
     if (!XQ) { xqStatus('象棋引擎未加载', false); xqHint('请刷新扩展后重试'); return; }
     xqPlayer = player || 'r';
     xqBoard = XQ.initialBoard();
@@ -2301,10 +2307,12 @@
   function xqPlayAI() {
     if (xqOver || xqBusy || !xqBoard) return;
     xqBusy = true;
+    const curGen = xqGen;
     xqStatus(xqMode === 'llm' ? '摸鱼兽（大模型）思考中…' : '摸鱼兽思考中…', false);
     const cv = $('xiangqi-canvas'); if (cv) cv.style.cursor = 'default';
     const ai = xqTurn;
     const finishWith = (move, note) => {
+      if (curGen !== xqGen) return; // 局已重开，放弃旧回调
       xqBusy = false; if (cv) cv.style.cursor = 'pointer';
       if (note) xqHint(note);
       if (!move) { xqOver = true; xqStatus('摸鱼兽无子可动 · 你赢了！', true); return; }

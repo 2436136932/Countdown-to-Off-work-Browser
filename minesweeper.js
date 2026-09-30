@@ -195,7 +195,7 @@
       mount(el, appCtx) {
         root = el; ctx = appCtx;
         reset();
-        gridEl.addEventListener('click', onGridClick);
+        root.addEventListener('click', onGridClick);
         root.addEventListener('contextmenu', onCtx);
         window.__smokeState = () => ({
           remain: R * C - M - dug, flags, over, win, dug, mines: M,
@@ -204,7 +204,10 @@
         window.__mnOpen = () => { dig(Math.floor(R / 2), Math.floor(C / 2)); return true; };
       },
       destroy() {
-        if (root) root.removeEventListener('contextmenu', onCtx);
+        if (root) {
+          root.removeEventListener('click', onGridClick);
+          root.removeEventListener('contextmenu', onCtx);
+        }
         try { delete window.__smokeState; } catch (e) { window.__smokeState = null; }
         try { delete window.__mnOpen; } catch (e) { window.__mnOpen = null; }
       },

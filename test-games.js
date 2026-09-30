@@ -40,6 +40,14 @@ function makeEl() {
     dispatch(type, ev) { (this.listeners[type] || []).forEach(fn => { try { fn(ev || {}); } catch (e) { console.error('dispatch error', type, e); } }); },
     get firstChild() { return this.children[0] || null; },
     parentNode: null,
+    closest(sel) {
+      let cur = this;
+      while (cur) {
+        if (sel.startsWith('.') && cur.className && cur.className.includes(sel.slice(1))) return cur;
+        cur = cur.parentNode;
+      }
+      return null;
+    },
   };
   return el;
 }
@@ -74,6 +82,10 @@ const MS = require('./minesweeper.js');
   ok('网格使用 CSS 变量 --c', host.children[0].style.setPropertyCallCount ? true : true); // style.setProperty stub 存在即不崩
   inst.onNewGame();
   ok('新局不崩', true);
+  ok('扫雷新局后 click 监听依然有效', (host.listeners['click'] || []).length > 0);
+  inst.onDiffChange('hard');
+  ok('扫雷切难度后 click 监听依然有效', (host.listeners['click'] || []).length > 0);
+  inst.onDiffChange('medium');
   const grid = host.children[0];
   ok('网格有格子（默认中等 12×12=144）', grid.children.length === 144, '实际 ' + grid.children.length);
   console.log('  setStatus:', statusLog.slice(0, 2).join(' | '));
@@ -88,6 +100,9 @@ const GG = require('./g2048.js');
   ok('2048 mount 不崩', true);
   inst.onNewGame();
   ok('2048 新局不崩', true);
+  ok('2048新局后 mousedown 监听依然有效', (hostG.listeners['mousedown'] || []).length > 0);
+  inst.onDiffChange('hard');
+  ok('2048切难度后 mousedown 监听依然有效', (hostG.listeners['mousedown'] || []).length > 0);
   // 冒烟：向左滑动 N 次，盘面应有变化且 max 增长（2/4 合并）
   const before = window.__smokeState();
   for (let i = 0; i < 8; i++) window.__g48Move('left');
@@ -112,6 +127,29 @@ const LK = require('./lianliankan.js');
   ok('连连看 mount 不崩', true);
   inst.onNewGame();
   ok('连连看 新局不崩', true);
+  ok('连连看新局后 click 监听依然有效', (hostL.listeners['click'] || []).length > 0);
+  inst.onDiffChange('hard');
+  ok('连连看切难度后 click 监听依然有效', (hostL.listeners['click'] || []).length > 0);
+  // 回到 medium 测图案不同绝不消除
+  inst.onDiffChange('medium');
+  const st0 = window.__smokeState();
+  // 模拟点击两个相邻但图案不同的格子：获取 wrap 下的 grid 里的 tile
+  const wrap = hostL.children[0];
+  const gridL = wrap && wrap.children[0];
+  if (gridL && gridL.children.length >= 2) {
+    const clickFn = hostL.listeners['click'][0];
+    const c0 = gridL.children[0], c1 = gridL.children[1];
+    // 强制设为两个不同图案
+    c0.dataset = { r: '1', c: '1' };
+    c1.dataset = { r: '1', c: '2' };
+    // 点第一个
+    clickFn({ target: c0 });
+    // 点第二个
+    clickFn({ target: c1 });
+    // 如果不同，不应进入消除，left 应当不变
+    const stAfter = window.__smokeState();
+    ok('不同图案绝不消除（left保持不变）', stAfter.left === st0.left, '初始 ' + st0.left + ' 现 ' + stAfter.left);
+  }
   // 冒烟：找一个可消除对（__llPair 返回 [a,b] 或 null）
   const pair = typeof window.__llPair === 'function' ? window.__llPair() : null;
   const st = window.__smokeState();

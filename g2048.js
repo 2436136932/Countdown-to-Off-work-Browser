@@ -176,7 +176,7 @@
       mount(el, appCtx) {
         root = el; ctx = appCtx;
         reset();
-        gridEl.addEventListener('mousedown', onDown);
+        root.addEventListener('mousedown', onDown);
         window.addEventListener('mouseup', onUp);
         window.addEventListener('keydown', onKey);
         window.__smokeState = () => ({
@@ -188,6 +188,7 @@
         window.__g48Move = (dir) => move(dir);
       },
       destroy() {
+        if (root) root.removeEventListener('mousedown', onDown);
         window.removeEventListener('mouseup', onUp);
         window.removeEventListener('keydown', onKey);
         try { delete window.__smokeState; } catch (e) { window.__smokeState = null; }

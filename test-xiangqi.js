@@ -62,6 +62,26 @@ ok('此时黑被将军', XQ.isInCheck(kb, 'b'));
 console.log('— 困毙也算负（无合法走法即判负）—');
 ok('genMoves 不依赖送将过滤', XQ.genMoves(kb, 'b').length >= 0); // 仅保证不抛错
 
+console.log('— 两将照面（飞将）—');
+{
+  const fb = Array.from({ length: 10 }, () => Array(9).fill(null));
+  fb[0][4] = { t: 'K', c: 'b' };
+  fb[9][4] = { t: 'K', c: 'r' };
+  fb[5][4] = { t: 'R', c: 'r' }; // 中间红车阻隔
+  ok('中间有子时未照面', !XQ.kingsFace(fb));
+  // 红车移开暴露出照面
+  const legals = XQ.legalMoves(fb, 'r');
+  const exposes = legals.some(m => m.fr === 5 && m.fc === 4 && m.tc !== 4);
+  ok('移开中间子暴露两将对脸为非法走法', !exposes);
+  // 红帅不可主动走到黑将正对面
+  fb[9][3] = { t: 'K', c: 'r' };
+  fb[9][4] = null;
+  fb[5][4] = null; // 4 列无子
+  const kingMoves = XQ.legalMoves(fb, 'r').filter(m => m.fr === 9 && m.fc === 3);
+  const stepsIntoCol4 = kingMoves.some(m => m.tr === 9 && m.tc === 4);
+  ok('帅不可主动走到与黑将同一空列对脸', !stepsIntoCol4);
+}
+
 console.log('— 序列化往返 —');
 const s = XQ.toStr(b0);
 const b0b = XQ.fromStr(s);

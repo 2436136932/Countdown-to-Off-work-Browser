@@ -184,11 +184,22 @@
     return false;
   }
 
+  // 照面判定（两将同列且中间无子）
+  function kingsFace(b) {
+    const rk = findKing(b, RED), bk = findKing(b, BLACK);
+    if (!rk || !bk || rk.c !== bk.c) return false;
+    const minR = Math.min(rk.r, bk.r), maxR = Math.max(rk.r, bk.r);
+    for (let r = minR + 1; r < maxR; r++) {
+      if (b[r][rk.c]) return false;
+    }
+    return true;
+  }
+
   function isInCheck(b, color) {
     const k = findKing(b, color);
     if (!k) return false;
     const enemy = color === RED ? BLACK : RED;
-    return isAttacked(b, k.r, k.c, enemy);
+    return isAttacked(b, k.r, k.c, enemy) || kingsFace(b);
   }
 
   // 合法走法（过滤送将/照面局面）
@@ -200,7 +211,7 @@
       const nb = applyMove(b, m);
       const k = findKing(nb, color);
       if (!k) continue;
-      if (!isAttacked(nb, k.r, k.c, enemy)) out.push(m);
+      if (!isAttacked(nb, k.r, k.c, enemy) && !kingsFace(nb)) out.push(m);
     }
     return out;
   }
@@ -311,7 +322,7 @@
   return {
     RED, BLACK, COLS, ROWS, CN, VALUE,
     initialBoard, cloneBoard, findKing, inBoard,
-    genMoves, applyMove, isAttacked, isInCheck, legalMoves,
+    genMoves, applyMove, isAttacked, isInCheck, legalMoves, kingsFace,
     toStr, fromStr, boardKey, parseCoord, enc, dec,
     evaluate, search,
   };

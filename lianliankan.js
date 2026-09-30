@@ -207,8 +207,9 @@
       if (a.r === r && a.c === c) { el.classList.remove('sel'); sel = null; return; }
 
       el.classList.add('sel');
-      const tB = grid[r][c];
-      if (t !== tB) {
+      const tA = grid[a.r][a.c];
+      const tB = grid[b.r][b.c];
+      if (tA !== tB) {
         // 图案不同：改选新的
         clearSel();
         sel = b; el.classList.add('sel');
@@ -276,7 +277,7 @@
       mount(el, appCtx) {
         root = el; ctx = appCtx;
         reset();
-        gridEl.addEventListener('click', onClick);
+        root.addEventListener('click', onClick);
         window.__smokeState = () => ({
           left, rows: R, cols: C,
           hasPair: !!findAnyPair(),
@@ -289,6 +290,7 @@
         };
       },
       destroy() {
+        if (root) root.removeEventListener('click', onClick);
         try { delete window.__smokeState; } catch (e) { window.__smokeState = null; }
         try { delete window.__llPair; } catch (e) { window.__llPair = null; }
       },
