@@ -34,6 +34,9 @@ async function doSave() {
       workdays: [...selected],
       start: $('start').value || '09:00',
       end: $('end').value || '18:00',
+      lunchEnabled: !!$('lunchEnabled').checked,
+      lunchStart: $('lunchStart').value || '12:00',
+      lunchEnd: $('lunchEnd').value || '13:00',
       payday: Math.min(31, Math.max(1, Number($('payday').value) || 15)),
       incomeMode: $('incomeMode').value,
       dailyIncome: Math.max(0, Number($('income').value) || 0),
@@ -47,6 +50,7 @@ async function doSave() {
       focusStart: $('focusStart').value || '12:00',
       focusEnd: $('focusEnd').value || '14:00',
       showWeek: $('showWeek').checked,
+      ceremonyEnabled: !!$('ceremonyEnabled').checked,
       petEnabled: $('petEnabled').checked,
       llmUrl: $('llmUrl').value.trim() || '',
       llmKey: $('llmKey').value.trim() || '',
@@ -299,6 +303,42 @@ $('focusEnabled')?.addEventListener('change', () => {
   autoSave(0);
 });
 
+/* ---------- 午休（不计入有效工时，时段可自定义） ---------- */
+const toMin = v => { const [h, m] = String(v || '').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+function fmtH(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (h && m) return `${h} 小时 ${m} 分钟`;
+  if (h) return `${h} 小时`;
+  return `${m} 分钟`;
+}
+function syncLunchUI() {
+  const on = !!($('lunchEnabled') && $('lunchEnabled').checked);
+  const wrap = $('lunch-time-wrap');
+  if (wrap) wrap.style.display = on ? 'flex' : 'none';
+
+  const st = ($('start') && $('start').value) || '09:00';
+  const en = ($('end') && $('end').value) || '18:00';
+  let shift = toMin(en) - toMin(st);
+  if (shift <= 0) shift += 24 * 60;                 // 跨午夜班次
+
+  let lunch = toMin(($('lunchEnd') && $('lunchEnd').value) || '13:00')
+            - toMin(($('lunchStart') && $('lunchStart').value) || '12:00');
+  if (lunch < 0) lunch += 24 * 60;
+
+  const cut = on ? Math.min(lunch, shift) : 0;      // 午休完全落在班次内时全额扣除
+  const eff = Math.max(0, shift - cut);
+
+  const hint = $('lunch-hint');
+  if (hint) hint.textContent = `午休 ${fmtH(lunch)} · 有效工时 ${fmtH(eff)} / 天`;
+  const off = $('lunch-off-hint');
+  if (off) off.textContent = on
+    ? `进度条 / 本周剩余 / 今日收益均按有效工时 ${fmtH(eff)}均分（班次 ${fmtH(shift)}）`
+    : `未扣除午休 · 班次时长 ${fmtH(shift)} 全部计为有效工时`;
+}
+$('lunchEnabled')?.addEventListener('change', () => { syncLunchUI(); autoSave(0); });
+['start', 'end', 'lunchStart', 'lunchEnd'].forEach(id => $(id)?.addEventListener('change', syncLunchUI));
+['lunchStart', 'lunchEnd'].forEach(id => $(id)?.addEventListener('input', syncLunchUI));
+
 /* ---------- 摸鱼宠物（大模型吐槽） ---------- */
 function syncPetUI() {
   const on = !!($('petEnabled') && $('petEnabled').checked);
@@ -419,6 +459,9 @@ async function init() {
   selected = new Set(cfg.workdays);
   $('start').value = cfg.start;
   $('end').value = cfg.end;
+  $('lunchEnabled').checked = !!cfg.lunchEnabled;
+  $('lunchStart').value = cfg.lunchStart || '12:00';
+  $('lunchEnd').value = cfg.lunchEnd || '13:00';
   $('payday').value = cfg.payday;
   $('incomeMode').value = cfg.incomeMode || 'daily';
   $('income').value = cfg.dailyIncome;
@@ -432,6 +475,7 @@ async function init() {
   $('focusStart').value = cfg.focusStart || '12:00';
   $('focusEnd').value = cfg.focusEnd || '14:00';
   $('showWeek').checked = cfg.showWeek !== false;
+  $('ceremonyEnabled').checked = cfg.ceremonyEnabled !== false;
   $('petEnabled').checked = !!cfg.petEnabled;
   $('llmUrl').value = cfg.llmUrl || '';
   $('llmKey').value = cfg.llmKey || '';
@@ -446,6 +490,7 @@ async function init() {
   if ($('petPrompt')) $('petPrompt').value = cfg.petPrompt || '';
   syncPetUI();
   syncFocusTimeUI();
+  syncLunchUI();
   $('theme').value = cfg.theme || 'light';
   $('eventSlot').value = cfg.eventSlot || 'holiday';
 
@@ -618,7 +663,7 @@ $('reset-default')?.addEventListener('click', async () => {
 });
 
 // 各输入项无感监听
-['start', 'end', 'payday', 'income', 'salary', 'focusStart', 'focusEnd'].forEach(id => {
+['start', 'end', 'payday', 'income', 'salary', 'focusStart', 'focusEnd', 'lunchStart', 'lunchEnd'].forEach(id => {
   $(id)?.addEventListener('input', () => autoSave(400));
   $(id)?.addEventListener('change', () => autoSave(0));
 });
@@ -627,7 +672,7 @@ $('reset-default')?.addEventListener('click', async () => {
   $(id)?.addEventListener('change', () => autoSave(0));
 });
 
-['probation', 'showIncome', 'showWeek', 'showBadge', 'notifyBeforeOff', 'notifyAtOff', 'petEnabled'].forEach(id => {
+['probation', 'showIncome', 'showWeek', 'showBadge', 'notifyBeforeOff', 'notifyAtOff', 'petEnabled', 'ceremonyEnabled'].forEach(id => {
   $(id)?.addEventListener('change', () => autoSave(0));
 });
 

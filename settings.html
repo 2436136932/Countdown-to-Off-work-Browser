@@ -407,6 +407,26 @@
       </div>
     </div>
     <div class="row">
+      <div class="row-label">午休</div>
+      <div class="row-body" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <label class="switch">
+            <input type="checkbox" id="lunchEnabled">
+            <span class="slider"></span>
+          </label>
+          <span class="unit">午休不计入有效工时（进度、本周剩余、今日收益同步扣除）</span>
+        </div>
+        <div id="lunch-time-wrap" style="display:none;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="unit">从</span>
+          <input type="time" id="lunchStart" value="12:00">
+          <span class="unit">至</span>
+          <input type="time" id="lunchEnd" value="13:00">
+          <span class="unit" id="lunch-hint" style="font-size:13px"></span>
+        </div>
+        <span class="unit" id="lunch-off-hint" style="font-size:12.5px"></span>
+      </div>
+    </div>
+    <div class="row">
       <div class="row-label">发薪日</div>
       <div class="row-body">
         <span class="unit">每月</span>
@@ -460,6 +480,16 @@
           <span class="slider"></span>
         </label>
         <span class="unit" style="margin-left:auto">显示「本周剩余工时」横幅</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label">仪式感</div>
+      <div class="row-body">
+        <label class="switch">
+          <input type="checkbox" id="ceremonyEnabled" checked>
+          <span class="slider"></span>
+        </label>
+        <span class="unit" style="margin-left:auto">本周最后一个工作日 & 节假日前夕专属横幅与提醒</span>
       </div>
     </div>
     <div class="row">

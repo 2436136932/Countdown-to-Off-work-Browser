@@ -5,6 +5,8 @@
  * v2: 官方放假 + 调休补班；getDayInfo / monthMatrix / badgeText。
  * v3: 月薪模式（按当月应上班天数折算日薪，支持试用期折扣）、
  *     自定义倒数日 events、今日进度 progress、卡片自定义 cards。
+ * v4: 午休不计入有效工时（lunchInfo / 有效工时）、
+ *     专属仪式感（本周最后一个工作日 / 节假日前夕 buildCeremony）。
  * ============================================================ */
 
 const CORE = (() => {
@@ -14,6 +16,9 @@ const CORE = (() => {
     workdays: [1, 2, 3, 4, 5],   // 0=周日 … 6=周六
     start: '09:00',
     end: '18:00',
+    lunchEnabled: false,          // 午休是否从有效工时中扣除
+    lunchStart: '12:00',
+    lunchEnd: '13:00',
     payday: 15,                  // 每月发薪日
     incomeMode: 'daily',         // daily | monthly
     dailyIncome: 300,            // 日薪模式：每天收入（元）
@@ -27,6 +32,7 @@ const CORE = (() => {
     focusStart: '12:00',         // 勿扰时段开始
     focusEnd: '14:00',           // 勿扰时段结束
     showWeek: true,              // 「本周剩余」横幅开关
+    ceremonyEnabled: true,       // 专属仪式感：本周最后一个工作日 / 节假日前夕横幅与提醒
     petEnabled: false,           // 摸鱼电子宠物开关
     llmUrl: '',                  // 大模型 API Base URL（OpenAI 兼容，如 https://api.deepseek.com/v1）
     llmKey: '',                  // API Key
@@ -196,6 +202,76 @@ const CORE = (() => {
     return new Date(base.getFullYear(), base.getMonth(), base.getDate(), hm.h, hm.m, 0, 0);
   }
 
+  // 严格解析设置页时间；非法值回退到默认，避免 NaN 污染倒计时/收益。
+  function validHM(str, fallback) {
+    const m = String(str || '').match(/^(\d{1,2}):(\d{2})$/);
+    const h = m ? Number(m[1]) : NaN;
+    const min = m ? Number(m[2]) : NaN;
+    if (Number.isInteger(h) && Number.isInteger(min) && h >= 0 && h <= 23 && min >= 0 && min <= 59) {
+      return { h, m: min };
+    }
+    return fallback;
+  }
+
+  /** 午休与工作班次的重叠毫秒数；班次外时间不会被重复扣除。 */
+  function lunchOverlapMs(day, shiftStart, shiftEnd, cfg) {
+    if (!cfg || !cfg.lunchEnabled) return 0;
+    const ls = validHM(cfg.lunchStart, { h: 12, m: 0 });
+    const le = validHM(cfg.lunchEnd, { h: 13, m: 0 });
+    const lunchStart = atTime(day, ls), lunchEnd = atTime(day, le);
+    if (!(lunchEnd > lunchStart)) return 0;
+    const from = Math.max(shiftStart.getTime(), lunchStart.getTime());
+    const to = Math.min(shiftEnd.getTime(), lunchEnd.getTime());
+    return Math.max(0, to - from);
+  }
+
+  function effectiveShift(day, cfg) {
+    const c = cfg || DEFAULTS;
+    const sh = validHM(c.start, { h: 9, m: 0 });
+    const eh = validHM(c.end, { h: 18, m: 0 });
+    const start = atTime(day, sh), end = atTime(day, eh);
+    const rawMs = Math.max(0, end - start);
+    const ls = validHM(c.lunchStart, { h: 12, m: 0 });
+    const le = validHM(c.lunchEnd, { h: 13, m: 0 });
+    const lunchStart = atTime(day, ls), lunchEnd = atTime(day, le);
+    const lunchMs = c.lunchEnabled && lunchEnd > lunchStart
+      ? Math.max(0, Math.min(end.getTime(), lunchEnd.getTime()) - Math.max(start.getTime(), lunchStart.getTime()))
+      : 0;
+    return { start, end, lunchStart, lunchEnd, rawMs, lunchMs, effectiveMs: Math.max(0, rawMs - lunchMs) };
+  }
+
+  /**
+   * 午休信息（给 UI 展示用）。
+   * @returns {{enabled:boolean, start:Date, end:Date, minutes:number,
+   *            inProgress:boolean, label:string, effectiveHours:number}}
+   */
+  function lunchInfo(now, cfg) {
+    const c = cfg || DEFAULTS;
+    const shift = effectiveShift(now, c);
+    const enabled = !!(c.lunchEnabled && shift.lunchMs > 0);
+    const s = shift.lunchStart, e = shift.lunchEnd;
+    return {
+      enabled,
+      start: s,
+      end: e,
+      minutes: Math.round(shift.lunchMs / 60000),
+      inProgress: enabled && now >= s && now < e,
+      label: `${pad(s.getHours())}:${pad(s.getMinutes())}–${pad(e.getHours())}:${pad(e.getMinutes())}`,
+      effectiveHours: Math.round(shift.effectiveMs / 3600000 * 10) / 10,
+    };
+  }
+
+  function elapsedEffectiveMs(now, shift) {
+    if (!(shift.effectiveMs > 0) || now <= shift.start) return 0;
+    const until = Math.min(now.getTime(), shift.end.getTime());
+    if (until <= shift.start.getTime()) return 0;
+    const elapsedRaw = until - shift.start.getTime();
+    const lunchElapsed = shift.lunchMs > 0
+      ? Math.max(0, Math.min(until, shift.lunchEnd.getTime()) - Math.max(shift.start.getTime(), shift.lunchStart.getTime()))
+      : 0;
+    return Math.max(0, Math.min(shift.effectiveMs, elapsedRaw - lunchElapsed));
+  }
+
   /**
    * 当前时刻是否处于「专注模式」勿扰时段内。
    * 支持跨午夜时段（如 22:00 → 06:00）。
@@ -317,9 +393,7 @@ const CORE = (() => {
    */
   function weekHoursRemaining(now = new Date(), cfg) {
     const c = cfg || DEFAULTS;
-    const { h: sh, m: sm } = parseHM(c.start || '09:00');
-    const { h: eh, m: em } = parseHM(c.end || '18:00');
-    const fullDayH = Math.max(0, (eh * 60 + em) - (sh * 60 + sm)) / 60;
+    const fullDayH = effectiveShift(now, c).effectiveMs / 3600000;
     if (!(fullDayH > 0)) return 0;
 
     const dow = now.getDay();               // 0=周日
@@ -335,11 +409,10 @@ const CORE = (() => {
 
       if (i < mondayOffset) continue;       // 本周已过去的日期
       if (i === mondayOffset) {
-        // 今天：按传入时间算剩余
-        const startT = atTime(day, { h: sh, m: sm });
-        const endT = atTime(day, { h: eh, m: em });
-        if (now < startT) total += fullDayH;
-        else if (now < endT) total += Math.max(0, (endT - now) / 3600000);
+        // 今天：按传入时间算剩余有效工时
+        const shift = effectiveShift(day, c);
+        if (now < shift.start) total += shift.effectiveMs / 3600000;
+        else if (now < shift.end) total += Math.max(0, (shift.effectiveMs - elapsedEffectiveMs(now, shift)) / 3600000);
         // 已下班 → 不计
       } else {
         total += fullDayH;
@@ -362,17 +435,14 @@ const CORE = (() => {
    */
   function earnedToday(now, cfg) {
     const c = cfg || DEFAULTS;
-    const { h: sh, m: sm } = parseHM(c.start || DEFAULTS.start);
-    const { h: eh, m: em } = parseHM(c.end || DEFAULTS.end);
-    const startT = atTime(now, { h: sh, m: sm });
-    const endT = atTime(now, { h: eh, m: em });
-    if (!(endT - startT > 0)) return 0;   // NaN 也拦住
+    const shift = effectiveShift(now, c);
+    if (!(shift.effectiveMs > 0)) return 0;
 
     if (!isWorkDate(now, c)) return 0;
-    if (now <= startT) return 0;
+    if (now <= shift.start) return 0;
 
-    const elapsed = Math.min(now, endT) - startT;
-    const ratio = Math.max(0, Math.min(1, elapsed / (endT - startT)));
+    const elapsed = elapsedEffectiveMs(now, shift);
+    const ratio = Math.max(0, Math.min(1, elapsed / shift.effectiveMs));
     if (!Number.isFinite(ratio)) return 0;
     return effectiveDailyIncome(now, c) * ratio;
   }
@@ -441,12 +511,55 @@ const CORE = (() => {
     return best;
   }
 
+  /* ---------- 专属仪式感 ---------- */
+
+  /**
+   * 本周最后一个工作日 / 节假日前夕的仪式感文案包。
+   * @param {Date} now
+   * @param {object} cfg
+   * @param {{worksToday:boolean, isLastWorkdayOfWeek:boolean,
+   *          preHoliday:boolean, preHolidayName:string}} flags 由 snapshot 算好传入
+   * @returns {{kind:string, tone:string, emoji:string, title:string,
+   *            sub:string, celebrate:string} | null} 不满足条件或用户关闭时为 null
+   */
+  function buildCeremony(now, cfg, flags) {
+    const c = cfg || DEFAULTS;
+    if (c.ceremonyEnabled === false) return null;
+    if (!flags || !flags.worksToday) return null;
+    const weekEnd = !!flags.isLastWorkdayOfWeek;
+    const eve = !!flags.preHoliday;
+    if (!weekEnd && !eve) return null;
+
+    const name = flags.preHolidayName || '假期';
+    if (weekEnd && eve) {
+      return {
+        kind: 'both', tone: 'festival', emoji: '🎉🏮',
+        title: '双喜临门 · 本周最后一个工作日',
+        sub: `明天开始放假：${name} · 假期模式即将开启`,
+        celebrate: `${name} · 假期模式正式开启`,
+      };
+    }
+    if (eve) {
+      return {
+        kind: 'holiday-eve', tone: 'festival', emoji: '🏮',
+        title: '节前最后一个工作日',
+        sub: `明天开始放假：${name} · 今晚就出发`,
+        celebrate: `${name} 到站 · 假期开始`,
+      };
+    }
+    return {
+      kind: 'week-end', tone: 'weekend', emoji: '🎉',
+      title: '本周最后一个工作日',
+      sub: '下班即自由 · 周末愉快',
+      celebrate: '周末愉快 🎉',
+    };
+  }
+
   /* ---------- 汇总给 UI 的数据包 ---------- */
   function snapshot(now, cfg) {
-    const { h: sh, m: sm } = parseHM(cfg.start);
-    const { h: eh, m: em } = parseHM(cfg.end);
-    const startT = atTime(now, { h: sh, m: sm });
-    const endT = atTime(now, { h: eh, m: em });
+    const shift = effectiveShift(now, cfg);
+    const startT = shift.start;
+    const endT = shift.end;
 
     const info = getDayInfo(now, cfg);
     const worksToday = info.kind === 'workday' || info.kind === 'makeup';
@@ -469,11 +582,35 @@ const CORE = (() => {
     }
 
     const nh = nextHoliday(now);
+    const date0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const isWorkToday = worksToday;
+    // 本周（周一 → 周日）最后一个工作日：今天之后到本周末为止没有任何工作日。
+    // 用「距周一的偏移」界定周末边界，避免周日上班（自定义工作日）时误判。
+    let isLastWorkdayOfWeek = false;
+    if (isWorkToday) {
+      const mondayOffset = (now.getDay() + 6) % 7;   // 0=周一 … 6=周日
+      const daysLeftInWeek = 6 - mondayOffset;        // 今天之后本星期内还剩的天数
+      isLastWorkdayOfWeek = true;
+      for (let i = 1; i <= daysLeftInWeek; i++) {
+        const d = new Date(date0.getFullYear(), date0.getMonth(), date0.getDate() + i);
+        if (isWorkDate(d, cfg)) { isLastWorkdayOfWeek = false; break; }
+      }
+    }
+    let preHoliday = false;
+    let preHolidayName = '';
+    if (isWorkToday) {
+      const tomorrow = new Date(date0.getFullYear(), date0.getMonth(), date0.getDate() + 1);
+      const tomorrowInfo = getDayInfo(tomorrow, cfg);
+      if (tomorrowInfo.kind === 'holiday') {
+        preHoliday = true;
+        preHolidayName = tomorrowInfo.name || (nh ? nh.name : '假期');
+      }
+    }
 
     // 今日进度：上班日内 start→end 线性；非工作日 null
     let progress = null;
-    if (worksToday && endT > startT) {
-      progress = Math.max(0, Math.min(1, (now - startT) / (endT - startT)));
+    if (worksToday && shift.effectiveMs > 0) {
+      progress = Math.max(0, Math.min(1, elapsedEffectiveMs(now, shift) / shift.effectiveMs));
     }
 
     const cards = {
@@ -495,6 +632,15 @@ const CORE = (() => {
       };
     }
 
+    // 午休与仪式感（给 UI 的展示数据）
+    const lunch = lunchInfo(now, cfg);
+    const ceremony = buildCeremony(now, cfg, {
+      worksToday,
+      isLastWorkdayOfWeek,
+      preHoliday,
+      preHolidayName,
+    });
+
     return {
       status,
       countdown: remainingSec,
@@ -503,9 +649,16 @@ const CORE = (() => {
       cards,
       eventCard,
       weekRemaining: weekHoursRemaining(now, cfg),
+      isLastWorkdayOfWeek,
+      preHoliday,
+      preHolidayName,
+      lunch,
+      ceremony,
       meta: {
         range: `${cfg.start} – ${cfg.end}`,
         dayLabel: DAY_LABELS[now.getDay()],
+        shiftHours: Math.round(shift.rawMs / 3600000 * 10) / 10,
+        effectiveHours: lunch.effectiveHours,
       },
     };
   }
@@ -547,6 +700,7 @@ const CORE = (() => {
     nextEvent, daysUntil,
     badgeText, snapshot,
     inFocusTime, weekHoursRemaining,
+    lunchInfo, buildCeremony,
     syncHolidays, applyCachedDays, REMOTE_URLS,
   };
 })();

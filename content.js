@@ -276,6 +276,73 @@
         font-size: 9.5px;
       }
       .dark .hotkey-hint { background: rgba(255,255,255,0.1); }
+
+      /* 专属仪式感飘带（本周最后一个工作日 / 节假日前夕） */
+      .cer-ribbon {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 12px;
+        border-radius: 12px;
+        overflow: hidden;
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--island-text, #1d1d1f);
+        background: linear-gradient(100deg, rgba(255,197,61,.24), rgba(255,59,48,.22), rgba(255,197,61,.24));
+        background-size: 200% 100%;
+        border: 0.5px solid rgba(255, 149, 0, 0.38);
+        animation: islCerBg 5s linear infinite;
+      }
+      .cer-ribbon[data-tone="weekend"] {
+        background: linear-gradient(100deg, rgba(125,211,255,.26), rgba(0,113,227,.22), rgba(165,214,111,.26));
+        background-size: 200% 100%;
+        border-color: rgba(0, 113, 227, 0.38);
+      }
+      @keyframes islCerBg { to { background-position: -200% 0; } }
+      .cer-ribbon::after {
+        content: '';
+        position: absolute;
+        top: 0; bottom: 0;
+        width: 40%;
+        background: linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent);
+        transform: translateX(-160%);
+        animation: islCerShine 3.4s ease-in-out infinite;
+        pointer-events: none;
+      }
+      @keyframes islCerShine {
+        0% { transform: translateX(-160%); }
+        55%, 100% { transform: translateX(340%); }
+      }
+      .cer-ribbon-emoji { flex-shrink: 0; font-size: 13px; }
+      .cer-ribbon-title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* 仪式感日：外壳流光描边 */
+      .island-shell::before {
+        content: '';
+        position: absolute;
+        inset: -1.5px;
+        border-radius: inherit;
+        padding: 1.5px;
+        background: linear-gradient(100deg, #FFC53D, #FF3B30, #FFC53D, #FF7A45);
+        background-size: 300% 100%;
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity .4s ease;
+        pointer-events: none;
+        animation: islCerBorder 5s linear infinite;
+      }
+      .island-shell.ceremony::before { opacity: 1; }
+      @keyframes islCerBorder { to { background-position: -300% 0; } }
+      .island-shell.mini .cer-ribbon { display: none !important; }
     `;
     shadowRoot.appendChild(style);
 
@@ -293,6 +360,11 @@
       <div class="time-row">
         <div class="sub-badge"><span class="sub-dot"></span><span id="isl-status">下班倒计时</span></div>
         <div class="clock-num" id="isl-time">00:00:00</div>
+      </div>
+
+      <div class="cer-ribbon" id="isl-ceremony" data-tone="festival" style="display:none;">
+        <span class="cer-ribbon-emoji" id="isl-cer-emoji">🎉</span>
+        <span class="cer-ribbon-title" id="isl-cer-title">本周最后一个工作日</span>
       </div>
 
       <div class="progress-wrap">
@@ -439,6 +511,8 @@
       const statusEl = shadowRoot.getElementById('isl-status');
       const progEl = shadowRoot.getElementById('isl-progress');
 
+      const cer = snap.ceremony;
+
       if (snap.status.key === 'rest') {
         statusEl.textContent = '今日休息中';
         timeEl.textContent = '休息中';
@@ -450,15 +524,36 @@
         timeEl.style.fontSize = isMini ? '22px' : '40px';
         progEl.style.width = '0%';
       } else if (snap.status.key === 'after') {
-        statusEl.textContent = '今日工作已顺利结束';
-        timeEl.textContent = '已下班 🎉';
-        timeEl.style.fontSize = isMini ? '18px' : '30px';
+        if (cer) {
+          // 仪式感日的下班时刻：换成专属庆祝文案
+          statusEl.textContent = '今日工作已顺利结束';
+          timeEl.textContent = cer.celebrate;
+          timeEl.style.fontSize = isMini ? '15px' : '21px';
+        } else {
+          statusEl.textContent = '今日工作已顺利结束';
+          timeEl.textContent = '已下班 🎉';
+          timeEl.style.fontSize = isMini ? '18px' : '30px';
+        }
         progEl.style.width = '100%';
       } else {
-        statusEl.textContent = '距离今日下班还有';
+        const inLunch = snap.lunch && snap.lunch.inProgress;
+        statusEl.textContent = inLunch ? '午休中 · 距离今日下班还有' : '距离今日下班还有';
         timeEl.textContent = fmtTime(snap.countdown);
         timeEl.style.fontSize = isMini ? '22px' : '40px';
         progEl.style.width = ((snap.progress || 0) * 100).toFixed(2) + '%';
+      }
+
+      // 专属仪式感飘带 + 外壳流光描边
+      const cerRibbon = shadowRoot.getElementById('isl-ceremony');
+      islandEl.classList.toggle('ceremony', !!cer);
+      if (cer && cerRibbon) {
+        cerRibbon.style.display = 'flex';
+        cerRibbon.dataset.tone = cer.tone;
+        shadowRoot.getElementById('isl-cer-emoji').textContent = cer.emoji;
+        shadowRoot.getElementById('isl-cer-title').textContent = cer.title;
+        cerRibbon.title = cer.sub;
+      } else if (cerRibbon) {
+        cerRibbon.style.display = 'none';
       }
 
       // 更新收益
@@ -487,20 +582,22 @@
         ? currentCfg.cards
         : ['payday', 'friday', 'holiday', 'income'];
       const activeKeys = cardsArr.filter(k => k !== 'income');
+      // value 为 null/undefined 的卡片（如当年已无法定假日的「节日」卡）直接跳过，避免渲染成 "null 天"
+      const usable = c => !!(c && c.value !== null && c.value !== undefined);
       activeKeys.forEach(k => {
-        if (snap.cards && snap.cards[k]) {
+        if (usable(snap.cards && snap.cards[k])) {
           cardList.push({ label: snap.cards[k].label, value: snap.cards[k].value, unit: snap.cards[k].unit });
         }
       });
-      if (snap.eventCard) {
+      if (usable(snap.eventCard)) {
         cardList.push({ label: snap.eventCard.label, value: snap.eventCard.value, unit: snap.eventCard.unit });
       }
 
       grid.innerHTML = '';
-      // 兜底：若仍为空，强制渲染 3 个默认小方块（避免 grid 全空让用户以为功能坏了）
+      // 兜底：若仍为空，强制渲染可用的默认小方块（避免 grid 全空让用户以为功能坏了）
       if (cardList.length === 0 && snap.cards) {
         ['payday', 'friday', 'holiday'].forEach(k => {
-          if (snap.cards[k]) cardList.push(snap.cards[k]);
+          if (usable(snap.cards[k])) cardList.push(snap.cards[k]);
         });
       }
       cardList.slice(0, 4).forEach(item => {
@@ -513,8 +610,10 @@
         grid.appendChild(tile);
       });
 
-      // 底部工作时间
-      shadowRoot.getElementById('isl-slot-tip').textContent = `工作日 ${currentCfg.start} – ${currentCfg.end}`;
+      // 底部工作时间（含自定义午休时段）
+      const lunchTip = (snap.lunch && snap.lunch.enabled) ? ` · 午休 ${snap.lunch.label}` : '';
+      shadowRoot.getElementById('isl-slot-tip').textContent =
+        `工作日 ${currentCfg.start} – ${currentCfg.end}${lunchTip}`;
     } catch (err) {
       console.error('Island tick error:', err);
     }

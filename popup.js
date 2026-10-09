@@ -49,17 +49,59 @@ function fmt(sec) {
 }
 
 /* ---------- 渲染主循环 ---------- */
+const CONFETTI_COLORS = ['#FF3B30', '#FF9F0A', '#34C759', '#0071E3', '#BF5AF2', '#FFD60A'];
+
+/** 仪式感横幅彩纸屑（每个横幅只挂载一次） */
+function mountConfetti(card) {
+  if (card.dataset.confetti === '1') return;
+  card.dataset.confetti = '1';
+  for (let i = 0; i < 12; i++) {
+    const dot = document.createElement('span');
+    dot.className = 'cer-dot';
+    dot.style.left = (5 + Math.random() * 90).toFixed(1) + '%';
+    dot.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    dot.style.animationDelay = (Math.random() * 2.8).toFixed(2) + 's';
+    dot.style.animationDuration = (2.2 + Math.random() * 1.6).toFixed(2) + 's';
+    card.appendChild(dot);
+  }
+}
+
 function render() {
   const now = new Date();
   CORE.loadConfig().then(cfg => {
     const snap = CORE.snapshot(now, cfg);
+    const cer = snap.ceremony;
 
-    $('status').textContent = snap.status.label;
+    /* 专属仪式感横幅（本周最后一个工作日 / 节假日前夕） */
+    const cerCard = $('ceremony-card');
+    if (cer && cerCard) {
+      cerCard.style.display = 'flex';
+      cerCard.dataset.tone = cer.tone;
+      $('ceremony-emoji').textContent = cer.emoji;
+      $('ceremony-title').textContent = cer.title;
+      $('ceremony-sub').textContent = cer.sub;
+      mountConfetti(cerCard);
+    } else if (cerCard) {
+      cerCard.style.display = 'none';
+    }
+
+    /* 状态文案：午休时段单独标注（倒计时仍指向下班时刻） */
+    let statusLabel = snap.status.label;
+    if (snap.status.key === 'working' && snap.lunch && snap.lunch.inProgress) {
+      statusLabel = '午休中 · 下班还有';
+    }
+    $('status').textContent = statusLabel;
 
     const elCd = $('countdown');
+    elCd.classList.remove('celebrate');
     if (snap.countdown !== null) {
       elCd.textContent = fmt(snap.countdown);
       elCd.classList.remove('rest-state');
+    } else if (snap.status.key === 'after' && cer) {
+      // 仪式感日的下班时刻：换成专属庆祝文案
+      elCd.textContent = cer.celebrate;
+      elCd.classList.remove('rest-state');
+      elCd.classList.add('celebrate');
     } else if (snap.status.key === 'rest') {
       elCd.textContent = '休息中';
       elCd.classList.add('rest-state');
@@ -100,7 +142,12 @@ function render() {
     /* 倒数日小组件网格渲染 */
     renderCards(snap, cfg);
 
-    $('range').textContent = `工作日 ${cfg.start} – ${cfg.end}`;
+    const lunchOn = !!(snap.lunch && snap.lunch.enabled);
+    $('range').textContent = `工作日 ${cfg.start} – ${cfg.end}`
+      + (lunchOn ? ` · 午休 ${snap.lunch.label}` : '');
+    $('range').title = lunchOn
+      ? `午休 ${snap.lunch.label} 不计工时 · 有效工时 ${snap.lunch.effectiveHours} 小时/天`
+      : `班次时长 ${snap.meta && snap.meta.shiftHours ? snap.meta.shiftHours : ''} 小时/天`;
 
     // 今日身份标签
     const info = snap.dayInfo;

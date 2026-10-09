@@ -142,11 +142,32 @@ async function maybeNotify() {
     const nowMin = today.getHours() * 60 + today.getMinutes();
     const diff = offMin - nowMin;   // 距下班的分钟数
 
+    // 专属仪式感：本周最后一个工作日 / 节假日前夕
+    const ceremony = cfg.ceremonyEnabled === false
+      ? null
+      : (CORE.snapshot(today, cfg).ceremony || null);
+
     if (diff === 30 && cfg.notifyBeforeOff) {
-      await markAndSend('before', '还有 30 分钟下班', '再坚持一下，胜利在望 🏃');
+      await markAndSend('before', '还有 30 分钟下班',
+        ceremony ? `最后 30 分钟：${ceremony.sub} 🎒` : '再坚持一下，胜利在望 🏃');
     }
     if (diff === 0 && cfg.notifyAtOff) {
-      await markAndSend('off', '到点下班啦', '今天的你辛苦了，好好休息 ✨');
+      if (ceremony) {
+        await markAndSend('off-cer', `🎉 ${ceremony.title}`, `${ceremony.celebrate} · 今天的你辛苦了 ✨`);
+      } else {
+        await markAndSend('off', '到点下班啦', '今天的你辛苦了，好好休息 ✨');
+      }
+    }
+
+    // 仪式感晨间播报：上班后 8:30–11:30 之间发一次
+    if (ceremony && nowMin >= 8 * 60 + 30 && nowMin <= 11 * 60 + 30) {
+      const MORN = {
+        both: ['🎉🏮 双喜临门', `${ceremony.sub}，今晚就能出发啦！`],
+        'holiday-eve': ['🏮 节前最后一个工作日', `${ceremony.sub}，行李可以先收拾起来了`],
+        'week-end': ['🎉 今天是本周最后一个工作日', '下班即自由 · 周末愉快！'],
+      };
+      const [t, m] = MORN[ceremony.kind] || ['专属仪式感', ceremony.sub];
+      await markAndSend('ceremony-' + ceremony.kind, t, m);
     }
 
     // 发薪日早上 9 点提示（精确到小时检查，9:00-9:59 之间第一次触发）

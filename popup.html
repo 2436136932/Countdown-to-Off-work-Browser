@@ -153,6 +153,91 @@
     padding: 10px 0;
     color: var(--text-secondary);
   }
+  /* 仪式感日的下班庆祝文案（渐变高光） */
+  .countdown.celebrate {
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    padding: 12px 0 4px;
+    background: linear-gradient(95deg, #FF9F0A, #FF375F 45%, #BF5AF2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* ---------- 专属仪式感横幅（本周最后一个工作日 / 节假日前夕） ---------- */
+  .ceremony-banner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(var(--bg-material), var(--bg-material)) padding-box,
+      linear-gradient(100deg, #FFC53D, #FF3B30, #FFC53D, #FF7A45) border-box;
+    background-size: 100% 100%, 300% 100%;
+    animation: cerBorder 6s linear infinite;
+    box-shadow: 0 8px 22px -10px rgba(255, 59, 48, 0.55);
+  }
+  .ceremony-banner[data-tone="weekend"] {
+    background:
+      linear-gradient(var(--bg-material), var(--bg-material)) padding-box,
+      linear-gradient(100deg, #7DD3FF, #0071E3, #A5D66F, #7DD3FF) border-box;
+    box-shadow: 0 8px 22px -10px rgba(0, 113, 227, 0.5);
+  }
+  @keyframes cerBorder { to { background-position: 0 0, -300% 0; } }
+  .ceremony-banner::after {
+    content: '';
+    position: absolute;
+    top: -25%;
+    bottom: -25%;
+    width: 45%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    transform: translateX(-160%);
+    animation: cerShine 3.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes cerShine {
+    0% { transform: translateX(-160%); }
+    55%, 100% { transform: translateX(340%); }
+  }
+  .cer-dot {
+    position: absolute;
+    top: 0;
+    width: 5px;
+    height: 8px;
+    border-radius: 1.5px;
+    opacity: 0;
+    pointer-events: none;
+    animation: cerFall 2.8s linear infinite;
+  }
+  @keyframes cerFall {
+    0%   { transform: translateY(-10px) rotate(0deg); opacity: 0; }
+    12%  { opacity: .95; }
+    100% { transform: translateY(54px) rotate(400deg); opacity: 0; }
+  }
+  .cer-emoji { font-size: 20px; line-height: 1; flex-shrink: 0; }
+  .cer-body { min-width: 0; }
+  .cer-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cer-sub {
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   /* ---------- 今日进度槽 (Apple Pill Capsule) ---------- */
   .progress-wrap {
@@ -414,6 +499,15 @@
 
   <!-- 倒计时视图 -->
   <div class="view on" id="view-down">
+    <!-- 专属仪式感横幅：本周最后一个工作日 / 节假日前夕 -->
+    <div class="ceremony-banner" id="ceremony-card" data-tone="festival" style="display:none;">
+      <span class="cer-emoji" id="ceremony-emoji">🎉</span>
+      <div class="cer-body">
+        <div class="cer-title" id="ceremony-title"></div>
+        <div class="cer-sub" id="ceremony-sub"></div>
+      </div>
+    </div>
+
     <div class="status-badge-wrap">
       <span class="status-dot"></span>
       <div class="eyebrow" id="status">距离下班还有</div>
