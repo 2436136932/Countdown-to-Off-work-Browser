@@ -442,14 +442,19 @@
     font-variant-numeric: tabular-nums;
   }
   .cal-cell.empty { visibility: hidden; }
+  .cal-cell.hol { color: var(--holiday-red); font-weight: 600; }
+  .cal-cell.makeup { color: var(--accent); font-weight: 600; }
+  /* 注意：.today 必须排在 .hol/.makeup 之后，否则「今天恰好是补班/假日」时
+     .makeup 的同级优先级会覆盖白色文字，出现紫底紫字、数字看不见的问题。
+     这里再显式声明组合态，保证与书写顺序无关。 */
   .cal-cell.today {
     background: var(--accent);
     color: #fff;
     font-weight: 600;
     box-shadow: 0 2px 6px var(--accent-glow);
   }
-  .cal-cell.hol { color: var(--holiday-red); font-weight: 600; }
-  .cal-cell.makeup { color: var(--accent); font-weight: 600; }
+  .cal-cell.today.hol,
+  .cal-cell.today.makeup { color: #fff; }
   .cal-cell .tag {
     position: absolute;
     bottom: 1px;
