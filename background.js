@@ -14,6 +14,12 @@ try {
 /* ---------- 角标：每分钟刷新 ---------- */
 chrome.alarms.create('badge', { periodInMinutes: 1 });
 
+/* ---------- 提醒检查：每分钟一次 ----------
+ * 关键：notify alarm 之前从未被创建，导致 maybeNotify() 只在 SW 冷启动/安装/浏览器启动时
+ * 偶然执行，几乎不可能正好命中 diff===30 / diff===0 那一分钟——「提前 30 分钟提醒」和
+ * 「到点提醒」实际上长期失效。这里补上周期性 alarm。 */
+chrome.alarms.create('notify', { periodInMinutes: 1 });
+
 /* ---------- alarm 分发 ---------- */
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'badge') await updateBadge();
@@ -61,23 +67,28 @@ async function applyLocalCache() {
   if (cache) CORE.applyCachedDays(cache);
 }
 
-/** 拉取当年+下一年数据；成功则把「当前年」的 JSON 快照写入缓存。 */
+/** 拉取当年+下一年数据；成功则把「已生效的年份 JSON」全部写入缓存。 */
 async function syncHolidays(silent = true) {
   const years = [new Date().getFullYear(), new Date().getFullYear() + 1];
   let okCount = 0;
-  let currentYearJson = null;
   for (const y of years) {
     const r = await CORE.syncHolidays(y);
-    if (r.ok) {
-      okCount++;
-      if (y === new Date().getFullYear()) currentYearJson = r;   // 带回元数据
-    }
+    if (r.ok) okCount++;
   }
   if (okCount > 0) {
     const prev = await cachedDays();
+    // 关键：必须把 days 数据一起落盘，否则 SW 休眠后 applyCachedDays 拿不到任何东西，
+    // 「联网自动更新」只在当次会话内有效，设置页也会显示成 0 处放假/调休。
+    const years_ = CORE.extraDaysList();
+    const totalDays = years_.reduce((n, j) => n + (j.days ? j.days.length : 0), 0);
     await chrome.storage.local.set({
       [HOLIDAY_CACHE_KEY]: {
         ...(prev || {}),
+        years: years_,
+        // 兼容旧读取方：主年份同时平铺一份
+        json: years_.find(j => j.year === new Date().getFullYear()) || years_[0] || null,
+        totalDays,
+        year: (years_.find(j => j.year === new Date().getFullYear()) || years_[0] || {}).year || null,
         fetchedAt: Date.now(),
         lastOk: okCount,          // 成功同步的年份数
         lastError: null,
@@ -185,12 +196,20 @@ function isBetween(d, h1, m1, h2, m2) {
 
 /* ---------- 消息：设置页手动触发同步 ---------- */
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg && msg.type === 'sync-holidays') {
+  // 兼容两种字段名：设置页历史上发的是 { action:'syncHolidays' }，
+  // 而这里只认 { type:'sync-holidays' }，导致「立即更新」按钮永远失败。
+  const isSyncReq = msg && (msg.type === 'sync-holidays' || msg.action === 'syncHolidays');
+  if (isSyncReq) {
     (async () => {
-      await applyLocalCache();
-      const okCount = await syncHolidays(false);
-      await updateBadge();
-      sendResponse({ ok: okCount > 0, years: okCount, error: okCount ? null : '所有数据源均不可达' });
+      try {
+        await applyLocalCache();
+        const okCount = await syncHolidays(false);
+        await updateBadge();
+        // ok 保持为「成功年份数」，与设置页的 `resp.ok > 0` 判断一致
+        sendResponse({ ok: okCount, years: okCount, error: okCount ? null : '所有数据源均不可达' });
+      } catch (err) {
+        sendResponse({ ok: 0, years: 0, error: String(err && err.message || err) });
+      }
     })();
     return true;   // 异步 sendResponse
   }

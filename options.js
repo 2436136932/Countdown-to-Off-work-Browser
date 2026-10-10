@@ -563,41 +563,12 @@ $('theme')?.addEventListener('change', () => {
   autoSave(0);
 });
 
-/* ---------- 保存 ---------- */
+/* ---------- 保存 ----------
+ * 说明：该按钮在 HTML 里是 display:none（配置已全量自动保存），保留仅为兜底。
+ * 旧实现是一份与 doSave() 重复且已经漂移的 payload（缺 glassColor 等字段），
+ * 现在直接复用 doSave()，避免两处字段列表再次不一致。 */
 $('save').addEventListener('click', async () => {
-  await CORE.saveConfig({
-    workdays: [...selected],
-    start: $('start').value || '09:00',
-    end: $('end').value || '18:00',
-    payday: Math.min(31, Math.max(1, Number($('payday').value) || 15)),
-    incomeMode: $('incomeMode').value,
-    dailyIncome: Math.max(0, Number($('income').value) || 0),
-    monthlySalary: Math.max(0, Number($('salary').value) || 0),
-    probation: $('probation').checked,
-    showIncome: $('showIncome').checked,
-    showBadge: $('showBadge').checked,
-    notifyBeforeOff: $('notifyBeforeOff').checked,
-    notifyAtOff: $('notifyAtOff').checked,
-    focusEnabled: $('focusEnabled').checked,
-    focusStart: $('focusStart').value || '12:00',
-    focusEnd: $('focusEnd').value || '14:00',
-    showWeek: $('showWeek').checked,
-    petEnabled: $('petEnabled').checked,
-    llmUrl: $('llmUrl').value.trim() || '',
-    llmKey: $('llmKey').value.trim() || '',
-    llmModel: $('llmModel').value || '',
-    llmTemperature: Math.min(1.5, Math.max(0, Number($('llmTemperature').value) || 0.9)),
-    petPrompt: ($('petPrompt') && $('petPrompt').value.trim()) || '',
-    llmMaxTokens: Math.max(32, Math.min(4096, Number($('llmMaxTokens').value) || 200)),
-    llmThinking: !!($('llmThinking') && $('llmThinking').checked),
-    theme: $('theme').value,
-    skin: currentSkin,
-    texture: currentTexture,
-    glassOpacity: $('glassOpacity') ? (isNaN(parseInt($('glassOpacity').value, 10)) ? 65 : parseInt($('glassOpacity').value, 10)) : 65,
-    eventSlot: $('eventSlot').value,
-    cards: cardsOrder.filter(k => k === 'income' ? true : !cardsHidden.has(k)),
-    events: events.map(e => ({ name: e.name, date: e.date, repeatYearly: !!e.repeatYearly })),
-  });
+  await doSave();
   const t = $('toast');
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
@@ -617,8 +588,21 @@ async function refreshHolidayStatus() {
     return;
   }
   const dateStr = holidayCache.fetchedAt ? new Date(holidayCache.fetchedAt).toLocaleString() : '最近';
-  const c = holidayCache.totalDays || holidayCache.days?.length || 0;
-  el.textContent = `已同步 ${holidayCache.year || 2026} 官方节假日数据（${c} 处放假/调休）`;
+  // 兼容三种缓存结构：{ years:[...] }（当前） / { json } / { days }
+  const years = Array.isArray(holidayCache.years) ? holidayCache.years.filter(j => j?.days?.length) : [];
+  const c = holidayCache.totalDays
+    || years.reduce((n, j) => n + j.days.length, 0)
+    || holidayCache.json?.days?.length
+    || holidayCache.days?.length
+    || 0;
+  const yearLabel = years.length
+    ? years.map(j => j.year).sort().join(' / ')
+    : (holidayCache.year || holidayCache.json?.year || 2026);
+  if (c > 0) {
+    el.textContent = `已同步 ${yearLabel} 官方节假日数据（${c} 处放假/调休）`;
+  } else {
+    el.textContent = '使用内置 2026 年官方数据（国办发明电〔2025〕7号）';
+  }
   sub.textContent = `上次检查：${dateStr} · 来源 holiday-cn (jsDelivr CDN)`;
 }
 
@@ -637,11 +621,14 @@ if (syncBtn) {
       if (resp && resp.ok > 0) {
         syncBtn.textContent = '更新完成 ✓';
         await refreshHolidayStatus();
+      } else if (resp && resp.error) {
+        syncBtn.textContent = '同步失败：' + resp.error;
       } else {
         syncBtn.textContent = '已是最新 / 跳过';
       }
-    } catch {
+    } catch (err) {
       syncBtn.textContent = '请求失败';
+      console.warn('holiday sync error:', err);
     } finally {
       setTimeout(() => { syncBtn.disabled = false; syncBtn.textContent = '立即更新'; }, 2200);
     }

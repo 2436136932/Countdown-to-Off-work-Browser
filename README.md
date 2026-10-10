@@ -116,26 +116,31 @@
 ```text
 offwork-countdown/
 ├── manifest.json       # 扩展配置核心（Manifest V3 + scripting + 快捷键）
-├── background.js       # 后台定时调度、图标角标刷新与全局命令分发
-├── core.js             # 倒计时、发薪日、节假日调休与薪资计算引擎
+├── background.js       # 后台定时调度、图标角标刷新、提醒通知与全局命令分发
+├── core.js             # 倒计时、发薪日、节假日调休、有效工时与薪资计算引擎
 ├── theme.js            # 13款莫兰迪皮肤色阶、光晕壁纸与毛玻璃渲染算法
 ├── popup.html / .js    # 右上角原生弹窗（等宽倒计时、药丸进度槽、直跳悬浮）
-├── options.html / .js  # 偏好设置中心（全自动保存、0%~100%空气毛玻璃滑块）
+├── settings.html / .js # 偏好设置中心（全自动保存、0%~100%空气毛玻璃滑块）
 ├── content.js          # 网页端大圆角真透视悬浮灵动岛（Shadow DOM 样式隔离沙盒）
-├── content_pet.js      # 摸鱼兽聊天悬浮窗 + 6 款小游戏视图（含 CSS 变量映射）
-├── gomoku.js           # 五子棋引擎
+├── content_pet.js      # 摸鱼兽聊天悬浮窗 + 6 款小游戏视图（五子棋逻辑亦在此）
 ├── xiangqi.js          # 中国象棋引擎
 ├── mahjong.js          # 红中麻将引擎（合肥赖子玩法）
 ├── minesweeper.js      # 扫雷引擎
 ├── g2048.js            # 2048 引擎
 ├── lianliankan.js      # 连连看引擎
-├── test-games.js       # 小游戏冒烟单测
+├── pack.js             # 打包脚本（按 manifest 校验后生成 offwork-countdown.zip）
+├── test-core-v13.js    # 核心算法回归（月薪折算 / 倒数日 / 进度）
 ├── test-lunch-ceremony.js # 午休有效工时 + 专属仪式感单测
+├── test-background.js  # 提醒调度 / 消息路由 / 节假日缓存落盘回归
+├── test-games.js       # 小游戏冒烟单测
 ├── test-mahjong.js     # 麻将单测
-├── test-mj-count.js    # 麻将手牌数量守恒回归
+├── test-mj-*.js        # 麻将手牌守恒 / 悔棋 / 末座回归
+├── test-xiangqi.js     # 象棋单测
 ├── welcome.html / .js  # 首次安装引导页
 └── icons/              # 16px / 32px / 48px / 128px 官方标准图标
 ```
+
+> 跑测试：`npm test`（等价于逐个执行上面的 `test-*.js`）。
 
 ---
 

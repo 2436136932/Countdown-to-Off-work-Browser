@@ -47,7 +47,7 @@ initColorBar();
 
 function openOptions() {
   try { chrome.runtime.openOptionsPage(); }
-  catch { location.href = 'options.html'; }
+  catch { location.href = 'settings.html'; }   // 修正：实际文件是 settings.html，此前指向不存在的 options.html
 }
 ['nav-open-options', 'foot-open-options'].forEach(id => {
   const el = $(id);

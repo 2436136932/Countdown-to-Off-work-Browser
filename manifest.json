@@ -56,9 +56,6 @@
     }
   },
   "host_permissions": [
-    "https://cdn.jsdelivr.net/*",
-    "https://fastly.jsdelivr.net/*",
-    "https://raw.githubusercontent.com/*",
     "https://*/*",
     "http://*/*"
   ],

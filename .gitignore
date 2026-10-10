@@ -7,14 +7,15 @@ dist/
 .idea/
 *.tmp
 *.py
+# 一次性/临时的推送辅助脚本（功能已由标准 git 命令取代）
 clean_tmp.js
 gh_push.js
 git_setup.js
 push_repo.js
 do_git_push.js
-pack.js
 repack.js
-test-core-*.js
+# 注意：pack.js 是正式打包脚本，必须纳入版本控制（见 README）
+# 注意：test-core-*.js 是最核心的回归测试，必须纳入版本控制
 offwork-countdown.zip
 # 废弃的独立页面版宠物（已被 content_pet.js 取代）
 pet.html

@@ -1,0 +1,15 @@
+{
+  "name": "offwork-countdown",
+  "version": "1.7.0",
+  "private": true,
+  "description": "下班倒计时 Chrome 扩展（Manifest V3）",
+  "scripts": {
+    "test": "node test-core-v13.js && node test-lunch-ceremony.js && node test-background.js && node test-games.js && node test-mahjong.js && node test-mj-count.js && node test-xiangqi.js",
+    "test:slow": "node test-mj-undo.js && node test-mj-lastseat.js && node test-mj-conserve.js",
+    "test:all": "npm test && npm run test:slow",
+    "pack": "node pack.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

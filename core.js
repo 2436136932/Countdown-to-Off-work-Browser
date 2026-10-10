@@ -84,10 +84,15 @@ const CORE = (() => {
   const _key = (y, m, d) => `${y}-${m}-${d}`;
   let _holidayMap = null;   // key -> 名称
   let _makeupMap = null;    // key -> 名称
-  let _extraDays = null;    // 远程合并数据（holiday-cn 格式 days[]），null = 未加载
+  let _extraDaysList = [];  // 远程合并数据（holiday-cn json，可含多年），空数组 = 未加载
+  let _mapsDirty = true;    // 脏标记：仅在数据变化后重建查询表
+  let _mapBuilds = 0;       // 诊断用：buildMaps 实际重建次数
 
   function buildMaps() {
-    if (_holidayMap && !_extraDays) return;
+    // 关键：命中缓存就直接返回。旧实现的条件是 `!_extraDays`，
+    // 一旦联网数据到位就退化成「每次调用全量重建」——而 snapshot 一次要调 20+ 次。
+    if (_holidayMap && !_mapsDirty) return;
+    _mapBuilds++;
     _holidayMap = {}; _makeupMap = {};
     for (const [year, ranges] of Object.entries(HOLIDAY_RANGES)) {
       for (const r of ranges) {
@@ -102,15 +107,17 @@ const CORE = (() => {
     for (const [year, list] of Object.entries(MAKEUP_WORKDAYS)) {
       for (const it of list) _makeupMap[_key(+year, it.m, it.d)] = it.name;
     }
-    // 远程数据优先级最高：覆盖内置表（官方最新公告为准）
-    if (_extraDays && Array.isArray(_extraDays.days)) {
-      for (const it of _extraDays.days) {
-        const [y, m, d] = it.date.split('-').map(Number);
+    // 远程数据优先级最高：覆盖内置表（官方最新公告为准）；可累积多年
+    for (const json of _extraDaysList) {
+      if (!json || !Array.isArray(json.days)) continue;
+      for (const it of json.days) {
+        const [y, m, d] = String(it.date).split('-').map(Number);
         const k = _key(y, m, d);
         if (it.isOffDay) { delete _makeupMap[k]; _holidayMap[k] = it.name; }
         else { delete _holidayMap[k]; _makeupMap[k] = it.name + '调休'; }
       }
     }
+    _mapsDirty = false;
   }
 
   /* ---------- 节假日数据：联网更新（holiday-cn） ---------- */
@@ -144,23 +151,39 @@ const CORE = (() => {
           lastErr = `${y} 年官方安排尚未发布`;
           continue;
         }
-        _extraDays = json;
-        // 立即重建查询表使远程数据生效
-        _holidayMap = null;
+        // 累积到列表（同年重复同步时替换，避免无限增长）
+        _extraDaysList = _extraDaysList.filter(j => j.year !== json.year).concat([json]);
+        _mapsDirty = true;   // 数据变了 → 下次查询时重建
         buildMaps();
-        return { ok: true, year: json.year, count: json.days.length };
+        return { ok: true, year: json.year, count: json.days.length, json };
       } catch (e) { lastErr = e.name === 'AbortError' ? '请求超时' : String(e.message || e); }
     }
     return { ok: false, error: lastErr };
   }
 
-  /** 应用本地缓存的远程数据（chrome.storage.local.holidayCache） */
+  /** 已生效的远程节假日数据（供 background 落盘缓存） */
+  function extraDaysList() {
+    return _extraDaysList.slice();
+  }
+
+  /**
+   * 应用本地缓存的远程数据（chrome.storage.local.holidayCache）。
+   * 兼容三种历史结构：{ json:{days} } / { days } / { years:[{days}] }
+   */
   function applyCachedDays(cached) {
-    const json = cached?.json?.days?.length ? cached.json
-      : (cached?.days?.length ? cached : null);
-    if (json) {
-      _extraDays = json;
-      _holidayMap = null;   // 强制重建
+    const list = [];
+    if (cached?.json?.days?.length) list.push(cached.json);
+    if (Array.isArray(cached?.years)) {
+      for (const j of cached.years) if (j?.days?.length) list.push(j);
+    }
+    if (!list.length && cached?.days?.length) list.push(cached);
+    if (list.length) {
+      // 同一年只保留一份（后写覆盖）
+      const byYear = new Map();
+      for (const j of _extraDaysList) byYear.set(j.year, j);
+      for (const j of list) byYear.set(j.year, j);
+      _extraDaysList = [...byYear.values()];
+      _mapsDirty = true;
     }
   }
 
@@ -193,11 +216,6 @@ const CORE = (() => {
   /* ---------- 工具 ---------- */
   const pad = n => String(n).padStart(2, '0');
 
-  function parseHM(str) {
-    const [h, m] = String(str).split(':').map(Number);
-    return { h: h || 0, m: m || 0 };
-  }
-
   function atTime(base, hm) {
     return new Date(base.getFullYear(), base.getMonth(), base.getDate(), hm.h, hm.m, 0, 0);
   }
@@ -211,18 +229,6 @@ const CORE = (() => {
       return { h, m: min };
     }
     return fallback;
-  }
-
-  /** 午休与工作班次的重叠毫秒数；班次外时间不会被重复扣除。 */
-  function lunchOverlapMs(day, shiftStart, shiftEnd, cfg) {
-    if (!cfg || !cfg.lunchEnabled) return 0;
-    const ls = validHM(cfg.lunchStart, { h: 12, m: 0 });
-    const le = validHM(cfg.lunchEnd, { h: 13, m: 0 });
-    const lunchStart = atTime(day, ls), lunchEnd = atTime(day, le);
-    if (!(lunchEnd > lunchStart)) return 0;
-    const from = Math.max(shiftStart.getTime(), lunchStart.getTime());
-    const to = Math.min(shiftEnd.getTime(), lunchEnd.getTime());
-    return Math.max(0, to - from);
   }
 
   function effectiveShift(day, cfg) {
@@ -279,8 +285,9 @@ const CORE = (() => {
   function inFocusTime(now = new Date(), cfg) {
     const c = cfg || DEFAULTS;
     if (!c.focusEnabled) return false;
-    const { h: sh, m: sm } = parseHM(c.focusStart || '12:00');
-    const { h: eh, m: em } = parseHM(c.focusEnd || '14:00');
+    // 与班次/午休共用同一套严格解析，非法值不再退化成 00:00
+    const { h: sh, m: sm } = validHM(c.focusStart, { h: 12, m: 0 });
+    const { h: eh, m: em } = validHM(c.focusEnd, { h: 14, m: 0 });
     const startMin = sh * 60 + sm;
     const endMin = eh * 60 + em;
     const curMin = now.getHours() * 60 + now.getMinutes();
@@ -701,7 +708,10 @@ const CORE = (() => {
     badgeText, snapshot,
     inFocusTime, weekHoursRemaining,
     lunchInfo, buildCeremony,
-    syncHolidays, applyCachedDays, REMOTE_URLS,
+    validHM, effectiveShift,
+    syncHolidays, applyCachedDays, extraDaysList, REMOTE_URLS,
+    /** 诊断：查询表实际重建次数（缓存是否生效） */
+    mapBuildCount: () => _mapBuilds,
   };
 })();
 

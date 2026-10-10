@@ -4,9 +4,26 @@
 
 const $ = id => document.getElementById(id);
 
+/* ---------- 配置缓存 ----------
+ * 旧实现每秒调用一次 CORE.loadConfig()（每次都走 chrome.storage.sync 异步 IO）。
+ * 这里改为「启动读一次 + 监听变更」，与悬浮岛（content.js 的 currentCfg）保持一致。 */
+let _cfg = null;
+let _cfgReady = CORE.loadConfig().then(c => (_cfg = c)).catch(() => (_cfg = { ...CORE.DEFAULTS }));
+function getConfig() { return _cfgReady.then(() => _cfg); }
+
+try {
+  chrome.storage.onChanged.addListener(async (changes, area) => {
+    if (area !== 'sync') return;
+    _cfg = await CORE.loadConfig();
+    if (typeof THEME !== 'undefined' && THEME.applyToDOM) THEME.applyToDOM(_cfg, document.documentElement);
+    render();
+    if ($('view-cal').classList.contains('on')) renderCalendar();
+  });
+} catch { /* 非扩展环境（如本地预览）忽略 */ }
+
 /* ---------- 主题与皮肤动态注入 ---------- */
 async function applyTheme() {
-  const cfg = await CORE.loadConfig();
+  const cfg = await getConfig();
   if (typeof THEME !== 'undefined' && THEME.applyToDOM) {
     THEME.applyToDOM(cfg, document.documentElement);
     // 同时也给 body 切换 dark class
@@ -68,7 +85,7 @@ function mountConfetti(card) {
 
 function render() {
   const now = new Date();
-  CORE.loadConfig().then(cfg => {
+  getConfig().then(cfg => {
     const snap = CORE.snapshot(now, cfg);
     const cer = snap.ceremony;
 
@@ -296,7 +313,7 @@ $('cal-next').addEventListener('click', () => {
 });
 
 function renderCalendar() {
-  CORE.loadConfig().then(cfg => {
+  getConfig().then(cfg => {
     $('cal-title').textContent = `${calY} 年 ${calM + 1} 月`;
     const wrap = $('cal-grid');
     wrap.innerHTML = '';
@@ -309,50 +326,41 @@ function renderCalendar() {
       wrap.appendChild(el);
     });
 
-    const firstDay = new Date(calY, calM, 1);
-    let startDay = firstDay.getDay(); // 0 是周日
-    startDay = startDay === 0 ? 6 : startDay - 1; // 转为周一为 0
-    const totalDays = new Date(calY, calM + 1, 0).getDate();
-
-    // 补齐月初空白
-    for (let i = 0; i < startDay; i++) {
-      const el = document.createElement('div');
-      el.className = 'cal-cell empty';
-      wrap.appendChild(el);
-    }
+    // 复用 core 的月历矩阵与节日列表（批量算好、已排序），避免此处重复实现导致两份逻辑漂移
+    const weeks = CORE.monthMatrix(calY, calM);            // 周一为首列，前导/尾部以 null 补齐
+    const fest = CORE.monthFestivals(calY, calM);          // [{d, name, kind}]
+    const festByDay = new Map(fest.map(f => [f.d, f]));
 
     const todayNow = new Date();
     const isCurrentMonth = (calY === todayNow.getFullYear() && calM === todayNow.getMonth());
     const todayDate = isCurrentMonth ? todayNow.getDate() : -1;
 
-    for (let d = 1; d <= totalDays; d++) {
-      const dt = new Date(calY, calM, d);
-      const cell = document.createElement('div');
-      cell.className = 'cal-cell';
-      cell.textContent = d;
+    const frag = document.createDocumentFragment();
+    for (const week of weeks) {
+      for (const cellData of week) {
+        const cell = document.createElement('div');
+        cell.className = 'cal-cell';
+        if (!cellData) {
+          cell.classList.add('empty');
+          frag.appendChild(cell);
+          continue;
+        }
+        const d = cellData.d;
+        cell.textContent = d;
+        if (d === todayDate) cell.classList.add('today');
 
-      if (d === todayDate) cell.classList.add('today');
-
-      try {
-        const info = (CORE.getDayInfo ? CORE.getDayInfo(dt, cfg) : (CORE.isWorkday ? CORE.isWorkday(dt, cfg) : { kind: 'workday' }));
-        if (info && info.kind === 'holiday') {
-          cell.classList.add('hol');
+        const f = festByDay.get(d);
+        if (f) {
+          cell.classList.add(f.kind === 'holiday' ? 'hol' : 'makeup');
+          cell.title = f.name || '';
           const tag = document.createElement('span');
           tag.className = 'tag';
-          tag.textContent = '假';
-          cell.appendChild(tag);
-        } else if (info && info.kind === 'makeup') {
-          cell.classList.add('makeup');
-          const tag = document.createElement('span');
-          tag.className = 'tag';
-          tag.textContent = '班';
+          tag.textContent = f.kind === 'holiday' ? '假' : '班';
           cell.appendChild(tag);
         }
-      } catch (err) {
-        console.warn('cal day info err:', err);
+        frag.appendChild(cell);
       }
-
-      wrap.appendChild(cell);
     }
+    wrap.appendChild(frag);
   });
 }
