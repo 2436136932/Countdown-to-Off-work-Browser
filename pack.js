@@ -20,7 +20,7 @@ const REQUIRED = [
   // content_scripts[0]
   'core.js', 'theme.js', 'content.js',
   // content_scripts[1]：游戏引擎 + 摸鱼窗
-  'xiangqi.js', 'mahjong.js', 'minesweeper.js', 'g2048.js', 'lianliankan.js', 'content_pet.js',
+  'xiangqi.js', 'mahjong.js', 'minesweeper.js', 'g2048.js', 'lianliankan.js', 'ddz.js', 'content_pet.js',
   // service worker
   'background.js',
   // 扩展页面

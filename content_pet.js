@@ -1042,6 +1042,119 @@
       
       .mj-tile.s2 { background: rgba(112, 134, 168, calc(0.10 + 0.14 * var(--glass-alpha))); }
 
+      /* ===== 斗地主（单副 54 张 · 洗牌 / 不洗牌） ===== */
+      .ddz-view {
+        display: flex; flex-direction: column; gap: 7px;
+        padding: 2px 0 4px; min-height: 0;
+      }
+      /* 顶部座位（左右两家） */
+      .ddz-seats {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 8px;
+      }
+      .ddz-seat {
+        display: flex; flex-direction: column; align-items: center; gap: 3px;
+        padding: 5px 9px; border-radius: 10px; min-width: 70px;
+        background: rgba(255, 255, 255, calc(0.24 + 0.34 * var(--glass-alpha)));
+        border: 0.5px solid rgba(0, 0, 0, 0.07);
+        font-size: 10px; line-height: 1.25;
+      }
+      .ddz-seat.active {
+        border-color: rgba(0, 122, 255, 0.55);
+        box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.14);
+      }
+      .ddz-seat .who { font-weight: 700; font-size: 10.5px; }
+      .ddz-seat .cnt { opacity: 0.72; font-variant-numeric: tabular-nums; }
+      .ddz-seat .role {
+        font-size: 9px; padding: 0 4px; border-radius: 4px;
+        background: rgba(255, 149, 0, 0.18); color: #b26a00;
+      }
+      .ddz-seat .role.farmer { background: rgba(0, 122, 255, 0.14); color: #0a5bb5; }
+
+      /* 中央出牌区 */
+      .ddz-center {
+        flex: 1; min-height: 74px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 4px; padding: 6px 4px;
+        border-radius: 12px;
+        background: rgba(120, 140, 170, calc(0.05 + 0.10 * var(--glass-alpha)));
+        border: 0.5px dashed rgba(0, 0, 0, 0.09);
+      }
+      .ddz-center .ddz-play-label { font-size: 9.5px; opacity: 0.66; }
+      .ddz-played { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
+
+      /* 牌面：真实扑克布局 —— rank/suit 固定左上角，重叠时始终可见 */
+      .ddz-card {
+        position: relative; flex: none;
+        width: 30px; height: 43px; border-radius: 5px;
+        background: rgba(255, 255, 255, 0.97);
+        border: 0.5px solid rgba(0, 0, 0, 0.16);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
+        font-family: -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+        font-weight: 700;
+        overflow: hidden;
+        user-select: none; -webkit-user-select: none;
+        cursor: default;
+      }
+      .ddz-card .rank {
+        position: absolute; top: 1.5px; left: 3px;
+        font-size: 11.5px; line-height: 1; letter-spacing: -0.04em;
+      }
+      .ddz-card .suit {
+        position: absolute; top: 14px; left: 3.5px;
+        font-size: 9px; line-height: 1; font-weight: 600;
+      }
+      .ddz-card .big-suit {
+        position: absolute; right: 2px; bottom: 1px;
+        font-size: 13px; line-height: 1; opacity: 0.55;
+      }
+      .ddz-card.red { color: #d70015; }
+      .ddz-card.black { color: #1d1d1f; }
+      .ddz-card.joker { color: #d70015; }
+      .ddz-card.joker .rank { font-size: 9.5px; top: 3px; }
+      .ddz-card.joker .suit { font-size: 9px; top: 15px; }
+      /* 中央区的小牌 */
+      .ddz-played .ddz-card { width: 25px; height: 36px; }
+      .ddz-played .ddz-card .rank { font-size: 10px; top: 1px; left: 2.5px; }
+      .ddz-played .ddz-card .suit { font-size: 8px; top: 12px; left: 3px; }
+      .ddz-played .ddz-card .big-suit { font-size: 11px; }
+      .ddz-played .ddz-card.joker .rank { font-size: 8.5px; }
+      .ddz-played .ddz-card.joker .suit { font-size: 8px; top: 12.5px; }
+
+      /* 我的手牌：重叠排布，可点选 */
+      .ddz-hand {
+        display: flex; justify-content: center; align-items: flex-end;
+        min-height: 52px; padding: 8px 2px 2px;
+      }
+      .ddz-hand .ddz-card {
+        margin-left: -11px; cursor: pointer;
+        transition: transform .12s ease, box-shadow .12s ease;
+      }
+      .ddz-hand .ddz-card:first-child { margin-left: 0; }
+      .ddz-hand .ddz-card.sel {
+        transform: translateY(-9px);
+        box-shadow: 0 4px 10px rgba(0, 122, 255, 0.30);
+        border-color: rgba(0, 122, 255, 0.65);
+      }
+      .ddz-hand .ddz-card:active { transform: translateY(-5px); }
+
+      /* 底部按钮行 */
+      .ddz-actions { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+      .ddz-actions .topbar-btn { padding: 5px 12px; font-size: 11.5px; }
+      .ddz-actions .topbar-btn:disabled { opacity: .38; cursor: default; }
+      .ddz-actions .topbar-btn.primary {
+        background: rgba(0, 122, 255, 0.90); color: #fff; border-color: transparent;
+      }
+      /* 叫分面板 */
+      .ddz-bid-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+      .ddz-bid-row .topbar-btn { padding: 6px 13px; font-size: 12px; }
+      /* 结算 */
+      .ddz-result {
+        text-align: center; font-size: 12.5px; font-weight: 700; padding: 4px 0;
+      }
+      .ddz-result .sub { display: block; font-size: 10px; font-weight: 500; opacity: .7; margin-top: 3px; }
+
+
     `;
     shadow.appendChild(style);
 
@@ -1061,6 +1174,7 @@
           <button class="topbar-btn icon-btn" id="view-minesweeper-btn" title="扫雷">⊞</button>
           <button class="topbar-btn icon-btn" id="view-g2048-btn" title="2048">Ⓑ</button>
           <button class="topbar-btn icon-btn" id="view-lianliankan-btn" title="连连看">🀫</button>
+          <button class="topbar-btn icon-btn" id="view-ddz-btn" title="斗地主（洗牌 / 不洗牌）">🃏</button>
           <button class="topbar-btn" id="reset-btn" title="清空聊天记录">新话题</button>
           <button class="topbar-btn icon-btn primary" id="close-btn" title="关闭">✕</button>
         </div>
@@ -1162,6 +1276,62 @@
         </div>
         <div class="mahjong-host" id="mahjong-host"></div>
         <div class="xiangqi-hint" id="mahjong-hint">点手牌打出 · 可碰/杠/自摸胡（红中是赖子，别打出去）</div>
+      </div>
+      <div class="ddz-view" id="ddz-view" style="display:none">
+        <div class="xiangqi-bar">
+          <span class="xiangqi-status" id="ddz-status">斗地主 · 洗牌模式</span>
+          <div class="xiangqi-actions">
+            <button class="topbar-btn" id="ddz-restart" title="新局">新局</button>
+          </div>
+        </div>
+        <div class="xiangqi-bar">
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;opacity:.7">发牌</span>
+            <button class="chip-mini on" data-ddzmode="shuffle" id="ddz-mode-shuffle">洗牌</button>
+            <button class="chip-mini" data-ddzmode="nosave" id="ddz-mode-nosave">不洗牌</button>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;opacity:.7">难度</span>
+            <button class="chip-mini" data-ddzdiff="easy" id="ddz-diff-easy">简单</button>
+            <button class="chip-mini on" data-ddzdiff="medium" id="ddz-diff-medium">中等</button>
+            <button class="chip-mini" data-ddzdiff="hard" id="ddz-diff-hard">困难</button>
+          </div>
+        </div>
+        <div class="ddz-seats">
+          <div class="ddz-seat" id="ddz-seat-left">
+            <span class="who">左家</span>
+            <span class="cnt" id="ddz-left-cnt">17 张</span>
+            <span class="role farmer" id="ddz-left-role" style="display:none">农民</span>
+          </div>
+          <div class="ddz-seat" id="ddz-seat-me">
+            <span class="who">我</span>
+            <span class="cnt" id="ddz-my-cnt">17 张</span>
+            <span class="role" id="ddz-my-role" style="display:none">地主</span>
+          </div>
+          <div class="ddz-seat" id="ddz-seat-right">
+            <span class="who">右家</span>
+            <span class="cnt" id="ddz-right-cnt">17 张</span>
+            <span class="role farmer" id="ddz-right-role" style="display:none">农民</span>
+          </div>
+        </div>
+        <div class="ddz-center" id="ddz-center">
+          <span class="ddz-play-label" id="ddz-center-label">准备发牌…</span>
+          <div class="ddz-played" id="ddz-played"></div>
+        </div>
+        <div class="ddz-hand" id="ddz-hand"></div>
+        <div class="ddz-bid-row" id="ddz-bid-row" style="display:none">
+          <button class="topbar-btn" id="ddz-bid-0">不叫</button>
+          <button class="topbar-btn" id="ddz-bid-1">1 分</button>
+          <button class="topbar-btn" id="ddz-bid-2">2 分</button>
+          <button class="topbar-btn primary" id="ddz-bid-3">3 分</button>
+        </div>
+        <div class="ddz-actions" id="ddz-actions" style="display:none">
+          <button class="topbar-btn primary" id="ddz-play">出牌</button>
+          <button class="topbar-btn" id="ddz-pass">不要</button>
+          <button class="topbar-btn" id="ddz-hint">提示</button>
+          <button class="topbar-btn" id="ddz-clear">取消选择</button>
+        </div>
+        <div class="ddz-result" id="ddz-result" style="display:none"></div>
       </div>
       <div class="game-view" id="minesweeper-view" style="display:none">
         <div class="xiangqi-bar">
@@ -1510,6 +1680,23 @@
     $('view-minesweeper-btn').addEventListener('click', () => switchView('minesweeper'));
     $('view-g2048-btn').addEventListener('click', () => switchView('g2048'));
     $('view-lianliankan-btn').addEventListener('click', () => switchView('lianliankan'));
+    // 斗地主
+    $('view-ddz-btn').addEventListener('click', () => switchView('ddz'));
+    $('ddz-restart').addEventListener('click', () => ddzNewGame(true));
+    ['ddz-mode-shuffle', 'ddz-mode-nosave'].forEach(id => {
+      $(id).addEventListener('click', () => ddzSetMode($(id).dataset.ddzmode));
+    });
+    ['ddz-diff-easy', 'ddz-diff-medium', 'ddz-diff-hard'].forEach(id => {
+      $(id).addEventListener('click', () => ddzSetDiff($(id).dataset.ddzdiff));
+    });
+    [0, 1, 2, 3].forEach(sc => {
+      const el = $('ddz-bid-' + sc);
+      if (el) el.addEventListener('click', () => ddzBid(sc));
+    });
+    $('ddz-play').addEventListener('click', ddzPlaySelected);
+    $('ddz-pass').addEventListener('click', ddzPass);
+    $('ddz-hint').addEventListener('click', ddzHint);
+    $('ddz-clear').addEventListener('click', () => { ddzSelected.clear(); ddzRender(); });
     $('minesweeper-restart').addEventListener('click', () => simpleNewGame('minesweeper'));
     ['mn-diff-easy', 'mn-diff-medium', 'mn-diff-hard'].forEach(id => {
       $(id).addEventListener('click', () => simpleSetDiff('minesweeper', $(id).dataset.mndiff));
@@ -1985,6 +2172,293 @@
   }
 
 
+  /* ---------- 斗地主（单副 54 张 · 洗牌 / 不洗牌） ---------- */
+  let ddzGame = null;
+  let ddzMode = 'shuffle';        // shuffle 每局重洗 | nosave 不洗牌（跨局沿用牌堆）
+  let ddzDiff = 'medium';
+  let ddzSelected = new Set();    // 当前选中的牌 id
+  let ddzStack = null;            // 不洗牌模式的牌堆（上一局收牌后）
+  let ddzAiTimer = null;
+  let ddzBusy = false;
+
+  function ddzSetStatus(t) {
+    const el = $('ddz-status');
+    if (el) el.textContent = '斗地主 · ' + (ddzMode === 'nosave' ? '不洗牌' : '洗牌') + ' · ' + t;
+  }
+
+  /** 牌面文字（王用 大/小 + 王） */
+  function ddzFace(id) {
+    const r = DDZ.rankOf(id);
+    if (r === 13) return { main: '小', sub: '王' };
+    if (r === 14) return { main: '大', sub: '王' };
+    return { main: DDZ.RANK_LABEL[r], sub: DDZ.SUIT_ICON[DDZ.suitOf(id)] };
+  }
+
+  function ddzCardEl(id, small) {
+    const f = ddzFace(id);
+    const el = document.createElement('div');
+    const tone = DDZ.cardTone(id);
+    el.className = 'ddz-card ' + tone;
+    // 左上角 rank + suit（重叠时始终可见），右下角一枚装饰大花色
+    const r = document.createElement('span');
+    r.className = 'rank';
+    r.textContent = f.main;
+    if (f.main === '10') r.style.fontSize = small ? '9px' : '10px';
+    el.appendChild(r);
+
+    const s = document.createElement('span');
+    s.className = 'suit';
+    s.textContent = f.sub;
+    el.appendChild(s);
+
+    if (tone !== 'joker') {
+      const big = document.createElement('span');
+      big.className = 'big-suit';
+      big.textContent = f.sub;
+      el.appendChild(big);
+    }
+    return el;
+  }
+
+  function ddzResizeHost() {
+    if (!panel) return;
+    const cur = parseInt(panel.style.width || '0', 10);
+    if (!cur || cur < 460) {
+      panel.style.width = '480px';
+      panel.style.height = Math.max(parseInt(panel.style.height || '0', 10) || 0, 600) + 'px';
+    }
+  }
+
+  function ddzSeatName(seat, me) {
+    if (seat === me) return '我';
+    return seat === (me + 1) % 3 ? '右家' : '左家';
+  }
+
+  function ddzRender() {
+    if (!ddzGame) return;
+    const st = ddzGame.state;
+    const me = st.seat;
+    const rightSeat = (me + 1) % 3;
+    const leftSeat = (me + 2) % 3;
+
+    // 座位：剩余张数 + 地主标记 + 当前行动高亮
+    const fill = (seatElId, cntId, roleId, seat) => {
+      const cntEl = $(cntId);
+      if (cntEl) cntEl.textContent = st.hands[seat].length + ' 张';
+      const roleEl = $(roleId);
+      if (roleEl) {
+        const isLL = st.landlord === seat;
+        roleEl.style.display = st.landlord >= 0 ? '' : 'none';
+        roleEl.textContent = isLL ? '地主' : '农民';
+        roleEl.classList.toggle('farmer', !isLL);
+      }
+      const seatEl = $(seatElId);
+      if (seatEl) seatEl.classList.toggle('active', st.phase === 'play' && st.turn === seat);
+    };
+    fill('ddz-seat-left', 'ddz-left-cnt', 'ddz-left-role', leftSeat);
+    fill('ddz-seat-right', 'ddz-right-cnt', 'ddz-right-role', rightSeat);
+    fill('ddz-seat-me', 'ddz-my-cnt', 'ddz-my-role', me);
+
+    // 我的手牌
+    const handEl = $('ddz-hand');
+    if (handEl) {
+      handEl.innerHTML = '';
+      for (const id of st.hands[me]) {
+        const el = ddzCardEl(id);
+        if (ddzSelected.has(id)) el.classList.add('sel');
+        el.addEventListener('click', () => {
+          if (st.phase !== 'play') return;
+          if (ddzSelected.has(id)) ddzSelected.delete(id);
+          else ddzSelected.add(id);
+          ddzRender();
+        });
+        handEl.appendChild(el);
+      }
+    }
+
+    // 中央出牌区
+    const playedEl = $('ddz-played');
+    const labelEl = $('ddz-center-label');
+    if (playedEl) {
+      playedEl.innerHTML = '';
+      if (st.table) {
+        for (const id of st.table.cards) playedEl.appendChild(ddzCardEl(id, true));
+        if (labelEl) {
+          const combo = st.table.combo;
+          labelEl.textContent = ddzSeatName(st.table.seat, me) + ' 出 · '
+            + (DDZ.TYPE_CN[combo.type] || '') + '（' + st.table.cards.length + ' 张）';
+        }
+      } else if (labelEl) {
+        if (st.phase === 'bid') labelEl.textContent = '叫分阶段 · 请叫分';
+        else if (st.phase === 'play') labelEl.textContent = (st.turn === me ? '轮到你出牌' : '等待对手…');
+        else labelEl.textContent = '本局结束';
+      }
+    }
+
+    // 按钮显隐
+    const bidRow = $('ddz-bid-row');
+    const actions = $('ddz-actions');
+    if (bidRow) bidRow.style.display = st.phase === 'bid' ? 'flex' : 'none';
+    if (actions) {
+      const myTurn = st.phase === 'play' && st.turn === me;
+      actions.style.display = (st.phase === 'play' || st.phase === 'over') ? 'flex' : 'none';
+      const playBtn = $('ddz-play');
+      const passBtn = $('ddz-pass');
+      const hintBtn = $('ddz-hint');
+      if (playBtn) playBtn.disabled = !myTurn || ddzSelected.size === 0;
+      if (passBtn) {
+        // 新一轮（桌面无牌）时必须出牌，不能过
+        const canPass = myTurn && !!st.table && st.table.seat !== me;
+        passBtn.disabled = !canPass;
+      }
+      if (hintBtn) hintBtn.disabled = !myTurn;
+    }
+  }
+
+  /** 开局（keepStack=false 时丢弃旧牌堆，重新洗） */
+  function ddzNewGame(keepStack) {
+    clearTimeout(ddzAiTimer);
+    ddzBusy = false;
+    ddzSelected.clear();
+    if (typeof DDZ === 'undefined') { ddzSetStatus('引擎未加载'); return; }
+    const useStack = ddzMode === 'nosave' && keepStack !== false ? ddzStack : null;
+    try {
+      ddzGame = DDZ.createGame({ mode: ddzMode, deckStack: useStack, diff: ddzDiff, seat: 0 });
+    } catch (e) {
+      ddzSetStatus('开局失败');
+      return;
+    }
+    const resEl = $('ddz-result');
+    if (resEl) { resEl.style.display = 'none'; resEl.innerHTML = ''; }
+    ddzSetStatus('请叫分');
+    ddzRender();
+  }
+
+  function ddzBid(score) {
+    if (!ddzGame || ddzGame.state.phase !== 'bid' || ddzBusy) return;
+    ddzBusy = true;
+    const g = ddzGame;
+    g.bid(0, score);
+    g.runAiBids();
+    let ok = g.settleBid();
+    if (!ok) {
+      // 三家都不叫：保底给我 1 分，避免无限重发
+      g.bid(0, 1);
+      ok = g.settleBid();
+    }
+    const st = g.state;
+    ddzBusy = false;
+    ddzSetStatus(st.landlord === 0 ? '你是地主 · 请出牌' : '你是农民 · 配合队友');
+    ddzRender();
+    // 地主不是我 → AI 先手
+    ddzAiLoop();
+  }
+
+  /** AI 连续行动（直到轮回玩家或本局结束） */
+  function ddzAiLoop() {
+    if (!ddzGame) return;
+    const st = ddzGame.state;
+    if (st.phase === 'over') { ddzFinish(); return; }
+    if (st.phase !== 'play') return;
+    if (!ddzGame.isAiTurn()) { ddzRender(); return; }
+    clearTimeout(ddzAiTimer);
+    ddzAiTimer = setTimeout(() => {
+      if (!ddzGame) return;
+      const cur = ddzGame.state;
+      if (cur.phase !== 'play' || !ddzGame.isAiTurn()) { ddzRender(); return; }
+      const seat = cur.turn;
+      const r = ddzGame.aiStep();
+      if (r && r.action === 'play') {
+        const combo = DDZ.parseCombo(r.cards);
+        ddzSetStatus(ddzSeatName(seat, cur.seat) + ' 出了 '
+          + (combo ? DDZ.TYPE_CN[combo.type] : '') + '（' + r.cards.length + ' 张）');
+      } else if (r) {
+        ddzSetStatus(ddzSeatName(seat, cur.seat) + ' 不要');
+      }
+      ddzRender();
+      ddzAiLoop();
+    }, 620);
+  }
+
+  function ddzFinish() {
+    const st = ddzGame.state;
+    const me = st.seat;
+    const iAmLandlord = st.landlord === me;
+    const iWon = st.winner && (
+      (st.winner.side === 'landlord' && iAmLandlord) ||
+      (st.winner.side === 'farmer' && !iAmLandlord)
+    );
+    const el = $('ddz-result');
+    if (el) {
+      el.style.display = 'block';
+      const title = iWon ? '🎉 你赢了' : '😵 你输了';
+      const side = st.winner ? (st.winner.side === 'landlord' ? '地主' : '农民') : '';
+      const who = st.winner ? ddzSeatName(st.winner.seat, me) : '';
+      el.innerHTML = title + '<span class="sub">' + side + '方获胜（' + who + ' 先出完）</span>';
+    }
+    ddzSetStatus(iWon ? '本局胜利 · 点新局继续' : '本局失败 · 点新局继续');
+    // 不洗牌模式：把本局打出的牌按顺序收起来，下一局沿用
+    if (ddzMode === 'nosave') {
+      try { ddzStack = ddzGame.harvestDeck(); } catch (e) { ddzStack = null; }
+    }
+    ddzRender();
+  }
+
+  function ddzPlaySelected() {
+    if (!ddzGame) return;
+    const st = ddzGame.state;
+    if (st.phase !== 'play' || st.turn !== st.seat) return;
+    const cards = [...ddzSelected];
+    if (!cards.length) { ddzSetStatus('先点手牌选牌'); return; }
+    const r = ddzGame.play(st.seat, cards);
+    if (!r.ok) { ddzSetStatus(r.error || '出牌失败'); return; }
+    ddzSelected.clear();
+    ddzRender();
+    const cur = ddzGame.state;
+    if (cur.phase === 'over') { ddzFinish(); return; }
+    ddzSetStatus('你出了 ' + cards.length + ' 张');
+    ddzAiLoop();
+  }
+
+  function ddzPass() {
+    if (!ddzGame) return;
+    const st = ddzGame.state;
+    if (st.phase !== 'play' || st.turn !== st.seat) return;
+    const r = ddzGame.pass(st.seat);
+    if (!r.ok) { ddzSetStatus(r.error || '不能过牌'); return; }
+    ddzSelected.clear();
+    ddzRender();
+    ddzSetStatus('你选择不要');
+    ddzAiLoop();
+  }
+
+  function ddzHint() {
+    if (!ddzGame) return;
+    const st = ddzGame.state;
+    if (st.phase !== 'play' || st.turn !== st.seat) return;
+    const cards = ddzGame.hint();
+    if (!cards || !cards.length) { ddzSetStatus('没有能压过的牌，建议不要'); return; }
+    ddzSelected = new Set(cards);
+    const combo = DDZ.parseCombo(cards);
+    ddzSetStatus('提示：' + (combo ? DDZ.TYPE_CN[combo.type] : '') + '（' + cards.length + ' 张）');
+    ddzRender();
+  }
+
+  function ddzSetMode(mode) {
+    ddzMode = mode === 'nosave' ? 'nosave' : 'shuffle';
+    $('ddz-mode-shuffle').classList.toggle('on', ddzMode === 'shuffle');
+    $('ddz-mode-nosave').classList.toggle('on', ddzMode === 'nosave');
+    ddzStack = null;                 // 切换模式时重置牌堆，避免串味
+    ddzNewGame(false);
+  }
+
+  function ddzSetDiff(d) {
+    ddzDiff = d;
+    $('ddz-diff-easy').classList.toggle('on', d === 'easy');
+    $('ddz-diff-medium').classList.toggle('on', d === 'medium');
+    $('ddz-diff-hard').classList.toggle('on', d === 'hard');
+  }
+
   /* ---------- 扫雷 / 2048 / 连连看（移植自 glass-games） ---------- */
   const simpleGames = {
     minesweeper: { win: 'MS',  icon: '⊞',
@@ -2044,8 +2518,9 @@
     const isGomoku = view === 'gomoku';
     const isXq = view === 'xiangqi';
     const isMj = view === 'mahjong';
+    const isDdz = view === 'ddz';
     const isSimple = ['minesweeper', 'g2048', 'lianliankan'].indexOf(view) >= 0;
-    const isGame = isGomoku || isXq || isMj || isSimple;
+    const isGame = isGomoku || isXq || isMj || isDdz || isSimple;
     const chat = $('chat-scroll'), bar = $('input-bar'), ps = $('pet-stage'), rst = $('reset-btn');
     if (chat) chat.style.display = isGame ? 'none' : '';
     if (bar) bar.style.display = isGame ? 'none' : '';
@@ -2057,7 +2532,12 @@
     if (xv) xv.style.display = isXq ? 'flex' : 'none';
     const mv = $('mahjong-view');
     if (mv) mv.style.display = isMj ? 'flex' : 'none';
+    const dv = $('ddz-view');
+    if (dv) dv.style.display = isDdz ? 'flex' : 'none';
     $('view-mahjong-btn').classList.toggle('on', isMj);
+    $('view-ddz-btn').classList.toggle('on', isDdz);
+    // 切走斗地主时停掉 AI 定时器，避免后台继续出牌
+    if (!isDdz) { clearTimeout(ddzAiTimer); }
     // 三个单人游戏视图
     const simpleViews = { minesweeper: 'minesweeper-view', g2048: 'g2048-view', lianliankan: 'lianliankan-view' };
     const simpleBtns = { minesweeper: 'view-minesweeper-btn', g2048: 'view-g2048-btn', lianliankan: 'view-lianliankan-btn' };
@@ -2087,6 +2567,11 @@
     if (isMj) {
       mjEnsure();            // 首次进入才 mount
       mjResizeHost();        // 麻将模式自动放宽，四方桌才放得下
+    }
+    if (isDdz) {
+      ddzResizeHost();       // 斗地主手牌多，同样放宽
+      if (!ddzGame) ddzNewGame(false);
+      else { ddzRender(); ddzAiLoop(); }
     }
     if (isSimple) {
       simpleEnsure(view);

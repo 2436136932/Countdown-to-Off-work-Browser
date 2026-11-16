@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Offwork Countdown — 下班倒计时",
   "short_name": "下班倒计时",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Apple 风格的下班倒计时：角标倒计时、下班提醒、节假日调休日历、月薪折算与自定义倒数日；午休不计有效工时，周末前与节前专属仪式感。",
   "minimum_chrome_version": "110",
   "icons": {
@@ -35,7 +35,7 @@
     },
     {
       "matches": ["<all_urls>"],
-      "js": ["xiangqi.js", "mahjong.js", "minesweeper.js", "g2048.js", "lianliankan.js", "content_pet.js"],
+      "js": ["xiangqi.js", "mahjong.js", "minesweeper.js", "g2048.js", "lianliankan.js", "ddz.js", "content_pet.js"],
       "run_at": "document_idle"
     }
   ],
