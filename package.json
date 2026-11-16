@@ -1,6 +1,6 @@
 {
   "name": "offwork-countdown",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "private": true,
   "description": "下班倒计时 Chrome 扩展（Manifest V3）",
   "scripts": {

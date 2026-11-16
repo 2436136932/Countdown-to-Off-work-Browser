@@ -1042,7 +1042,11 @@
       
       .mj-tile.s2 { background: rgba(112, 134, 168, calc(0.10 + 0.14 * var(--glass-alpha))); }
 
-      /* ===== 斗地主（单副 54 张 · 洗牌 / 不洗牌） ===== */
+      /* ===== 斗地主（单副 54 张 · 洗牌 / 不洗牌） =====
+       * 全部走 calc() 联动 --glass-alpha（玻璃透明度）与 --stone-ink（墨色，摸鱼保底 0.15），
+       * 与扫雷/2048/连连看/麻将保持一致：面板拉透明时牌面一起变淡，摸鱼不易被发现。
+       * 注意：牌面不要再用固定 rgba(255,255,255,.97) + 固定红黑色 —— 那样滑块对牌无效。
+       */
       .ddz-view {
         display: flex; flex-direction: column; gap: 7px;
         padding: 2px 0 4px; min-height: 0;
@@ -1055,21 +1059,30 @@
       .ddz-seat {
         display: flex; flex-direction: column; align-items: center; gap: 3px;
         padding: 5px 9px; border-radius: 10px; min-width: 70px;
-        background: rgba(255, 255, 255, calc(0.24 + 0.34 * var(--glass-alpha)));
-        border: 0.5px solid rgba(0, 0, 0, 0.07);
+        background: rgba(168, 172, 180, calc(0.03 + 0.10 * var(--glass-alpha)));
+        border: 0.5px solid rgba(120, 126, 138, calc(0.08 + 0.16 * var(--glass-alpha)));
         font-size: 10px; line-height: 1.25;
       }
       .ddz-seat.active {
-        border-color: rgba(0, 122, 255, 0.55);
-        box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.14);
+        border-color: rgba(126, 144, 170, calc(0.20 + 0.35 * var(--glass-alpha)));
+        box-shadow: 0 0 0 2px rgba(126, 144, 170, calc(0.06 + 0.14 * var(--glass-alpha)));
       }
       .ddz-seat .who { font-weight: 700; font-size: 10.5px; }
-      .ddz-seat .cnt { opacity: 0.72; font-variant-numeric: tabular-nums; }
+      .ddz-seat .cnt {
+        font-variant-numeric: tabular-nums;
+        /* 用主题文字色（深/浅自适应）+ opacity 联动，避免深色主题下深字看不见 */
+        color: var(--island-text);
+        opacity: calc(0.58 + 0.42 * var(--stone-ink));
+      }
       .ddz-seat .role {
         font-size: 9px; padding: 0 4px; border-radius: 4px;
-        background: rgba(255, 149, 0, 0.18); color: #b26a00;
+        background: rgba(255, 149, 0, calc(0.10 + 0.14 * var(--glass-alpha)));
+        color: rgba(178, 106, 0, calc(0.45 + 0.45 * var(--stone-ink)));
       }
-      .ddz-seat .role.farmer { background: rgba(0, 122, 255, 0.14); color: #0a5bb5; }
+      .ddz-seat .role.farmer {
+        background: rgba(126, 144, 170, calc(0.08 + 0.14 * var(--glass-alpha)));
+        color: rgba(60, 100, 170, calc(0.45 + 0.45 * var(--stone-ink)));
+      }
 
       /* 中央出牌区 */
       .ddz-center {
@@ -1077,24 +1090,30 @@
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: 4px; padding: 6px 4px;
         border-radius: 12px;
-        background: rgba(120, 140, 170, calc(0.05 + 0.10 * var(--glass-alpha)));
-        border: 0.5px dashed rgba(0, 0, 0, 0.09);
+        background: rgba(120, 140, 170, calc(0.03 + 0.08 * var(--glass-alpha)));
+        border: 0.5px dashed rgba(120, 126, 138, calc(0.08 + 0.14 * var(--glass-alpha)));
       }
-      .ddz-center .ddz-play-label { font-size: 9.5px; opacity: 0.66; }
+      .ddz-center .ddz-play-label {
+        font-size: 9.5px;
+        color: var(--island-text);
+        opacity: calc(0.52 + 0.40 * var(--stone-ink));
+      }
       .ddz-played { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
 
       /* 牌面：真实扑克布局 —— rank/suit 固定左上角，重叠时始终可见 */
       .ddz-card {
         position: relative; flex: none;
         width: 30px; height: 43px; border-radius: 5px;
-        background: rgba(255, 255, 255, 0.97);
-        border: 0.5px solid rgba(0, 0, 0, 0.16);
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
+        /* 牌底：拉透明时几乎消失（0.05），实心时也只是淡灰白（0.35），不再有刺眼白卡 */
+        background: rgba(250, 250, 252, calc(0.05 + 0.30 * var(--glass-alpha)));
+        border: 0.5px solid rgba(120, 126, 138, calc(0.10 + 0.20 * var(--glass-alpha)));
+        box-shadow: 0 1px 2px rgba(0, 0, 0, calc(0.02 + 0.08 * var(--glass-alpha)));
         font-family: -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
         font-weight: 700;
         overflow: hidden;
         user-select: none; -webkit-user-select: none;
         cursor: default;
+        transition: background .2s ease, border-color .2s ease;
       }
       .ddz-card .rank {
         position: absolute; top: 1.5px; left: 3px;
@@ -1106,11 +1125,13 @@
       }
       .ddz-card .big-suit {
         position: absolute; right: 2px; bottom: 1px;
-        font-size: 13px; line-height: 1; opacity: 0.55;
+        font-size: 13px; line-height: 1;
+        opacity: calc(0.18 + 0.42 * var(--stone-ink));
       }
-      .ddz-card.red { color: #d70015; }
-      .ddz-card.black { color: #1d1d1f; }
-      .ddz-card.joker { color: #d70015; }
+      /* 红黑同调：色相保留以区分花色，透明度全部跟 --stone-ink 联动 */
+      .ddz-card.red { color: rgba(198, 108, 100, calc(0.42 + 0.48 * var(--stone-ink))); }
+      .ddz-card.black { color: rgba(29, 29, 31, calc(0.42 + 0.48 * var(--stone-ink))); }
+      .ddz-card.joker { color: rgba(198, 108, 100, calc(0.45 + 0.45 * var(--stone-ink))); }
       .ddz-card.joker .rank { font-size: 9.5px; top: 3px; }
       .ddz-card.joker .suit { font-size: 9px; top: 15px; }
       /* 中央区的小牌 */
@@ -1128,13 +1149,15 @@
       }
       .ddz-hand .ddz-card {
         margin-left: -11px; cursor: pointer;
-        transition: transform .12s ease, box-shadow .12s ease;
+        transition: transform .12s ease, box-shadow .12s ease, background .2s ease;
       }
       .ddz-hand .ddz-card:first-child { margin-left: 0; }
+      /* 选中态属于操作反馈，需要比牌面更醒目，但仍随玻璃联动，不会在摸鱼模式下抢眼 */
       .ddz-hand .ddz-card.sel {
         transform: translateY(-9px);
-        box-shadow: 0 4px 10px rgba(0, 122, 255, 0.30);
-        border-color: rgba(0, 122, 255, 0.65);
+        box-shadow: 0 4px 10px rgba(0, 122, 255, calc(0.06 + 0.22 * var(--glass-alpha)));
+        border-color: rgba(0, 122, 255, calc(0.28 + 0.42 * var(--glass-alpha)));
+        background: rgba(240, 246, 255, calc(0.10 + 0.34 * var(--glass-alpha)));
       }
       .ddz-hand .ddz-card:active { transform: translateY(-5px); }
 
@@ -1143,7 +1166,9 @@
       .ddz-actions .topbar-btn { padding: 5px 12px; font-size: 11.5px; }
       .ddz-actions .topbar-btn:disabled { opacity: .38; cursor: default; }
       .ddz-actions .topbar-btn.primary {
-        background: rgba(0, 122, 255, 0.90); color: #fff; border-color: transparent;
+        background: rgba(126, 144, 170, calc(0.30 + 0.45 * var(--glass-alpha)));
+        color: rgba(255, 255, 255, calc(0.55 + 0.40 * var(--stone-ink)));
+        border-color: transparent;
       }
       /* 叫分面板 */
       .ddz-bid-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
@@ -1151,8 +1176,13 @@
       /* 结算 */
       .ddz-result {
         text-align: center; font-size: 12.5px; font-weight: 700; padding: 4px 0;
+        color: var(--island-text);
+        opacity: calc(0.62 + 0.38 * var(--stone-ink));
       }
-      .ddz-result .sub { display: block; font-size: 10px; font-weight: 500; opacity: .7; margin-top: 3px; }
+      .ddz-result .sub {
+        display: block; font-size: 10px; font-weight: 500; margin-top: 3px;
+        opacity: 0.68;
+      }
 
 
     `;
